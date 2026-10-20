@@ -32,7 +32,8 @@
       "target": [
         "dmg",
         "zip"
-      ]
+      ],
+      "hardenedRuntime": false
     },
     "win": {
       "target": [
@@ -50,7 +51,8 @@
       "executableName": "worldloom"
     },
     "electronVersion": "34.5.8",
-    "artifactName": "Worldloom-${version}-${os}-${arch}.${ext}"
+    "artifactName": "Worldloom-${version}-${os}-${arch}.${ext}",
+    "afterPack": "../../scripts/adhoc-sign.cjs"
   },
   "devDependencies": {
     "electron": "34.5.8",

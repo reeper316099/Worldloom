@@ -39,7 +39,7 @@ Requires Node 22. Open a **demo world** from the home screen, or create your own
 
 ## Builds are unsigned
 
-Installers are not code-signed or notarized yet: macOS will say the app is from an unidentified developer (right-click → Open), Windows SmartScreen will warn. To add signing later: set `CSC_LINK`/`CSC_KEY_PASSWORD` (+ `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID` for notarization) as GitHub secrets and add a `mac.notarize` block / Windows certificate to the `build` section of `apps/desktop/package.json`; the release workflow already passes them through.
+Installers are not notarized yet. The macOS app is **ad-hoc signed** (a build hook does this), so Gatekeeper shows “unidentified developer” instead of “damaged”: right-click the app → Open, or allow it in System Settings → Privacy & Security. If macOS still says the app is damaged (a quarantine flag on a downloaded copy), run `xattr -cr /Applications/Worldloom.app` once. Windows SmartScreen will warn (More info → Run anyway). To add signing later: set `CSC_LINK`/`CSC_KEY_PASSWORD` (+ `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID` for notarization) as GitHub secrets and add a `mac.notarize` block / Windows certificate to the `build` section of `apps/desktop/package.json`; the release workflow already passes them through.
 
 ## License / content
 
