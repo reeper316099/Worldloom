@@ -1,8 +1,14 @@
 name: Release (unsigned installers)
 on:
-  workflow_dispatch:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag to attach the installers to (leave empty to only build artifacts)'
+        required: false
+        type: string
+
 jobs:
   dist:
     strategy:
@@ -24,7 +30,12 @@ jobs:
           for v in CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
             if [ -z "${!v}" ]; then unset "$v"; fi
           done
-          npm run dist -w @worldloom/desktop -- --publish never
+          # Name the installers after the release tag (v1.2.3 -> 1.2.3) when there is one.
+          TAG="${{ github.event.inputs.tag }}"
+          if [ -z "$TAG" ] && [ "${GITHUB_REF_TYPE}" = "tag" ]; then TAG="${GITHUB_REF_NAME}"; fi
+          EXTRA=()
+          if [ -n "$TAG" ]; then EXTRA=("-c.extraMetadata.version=${TAG#v}"); fi
+          npm run dist -w @worldloom/desktop -- --publish never "${EXTRA[@]}"
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
           # optional signing: set these repository secrets to sign/notarize (see README)
@@ -42,3 +53,31 @@ jobs:
             apps/desktop/release/*.exe
             apps/desktop/release/*.AppImage
             apps/desktop/release/*.deb
+          if-no-files-found: error
+
+  attach:
+    # Adds the built installers to the GitHub Release for the tag (created as a draft if it doesn't exist yet).
+    needs: dist
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: worldloom-*
+          path: installers
+          merge-multiple: true
+      - name: Upload to the release
+        shell: bash
+        run: |
+          TAG="${{ github.event.inputs.tag }}"
+          if [ -z "$TAG" ] && [ "${GITHUB_REF_TYPE}" = "tag" ]; then TAG="${GITHUB_REF_NAME}"; fi
+          if [ -z "$TAG" ]; then echo "No tag: installers stay as workflow artifacts only."; exit 0; fi
+          ls -lh installers
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --draft --verify-tag --title "$TAG" --notes "Unsigned installers; see the README for first-run notes."
+          fi
+          gh release upload "$TAG" installers/* --clobber
