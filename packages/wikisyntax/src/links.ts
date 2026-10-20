@@ -97,3 +97,15 @@ export function extractSection(source: string, title: string): string | undefine
   const next = heads.slice(i + 1).find((h) => h[1]!.length <= level);
   return source.slice(start, next ? next.index : undefined).trim();
 }
+
+const CLAIM_RE = /\{\{\s*claim\s*:\s*(confirmed|inferred|theory|retconned)\s*\}\}([\s\S]*?)\{\{\s*\/claim\s*\}\}/gi;
+/** Cheap claim scan (no Markdown parse) for health reports: claim kind, plain text, and whether it carries a citation. */
+export function extractClaims(source: string): Array<{ kind: string; text: string; cited: boolean }> {
+  const out: Array<{ kind: string; text: string; cited: boolean }> = [];
+  for (const m of maskCode(source).matchAll(CLAIM_RE)) {
+    const inner = source.slice(m.index! + m[0].indexOf('}}') + 2, m.index! + m[0].lastIndexOf('{{'));
+    const text = inner.replace(/\{\{[^}]*\}\}/g, '').replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_, a: string, b?: string) => b ?? a).replace(/\s+/g, ' ').trim();
+    out.push({ kind: m[1]!.toLowerCase(), text, cited: /\{\{\s*src\s*:/.test(inner) });
+  }
+  return out;
+}

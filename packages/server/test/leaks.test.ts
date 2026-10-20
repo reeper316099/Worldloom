@@ -8,6 +8,7 @@ import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
+import { unzipSync, strFromU8 } from 'fflate';
 import { WorldManager, buildApp } from '../src';
 import { SERIES } from '../../../starter-worlds/src/series';
 import { CAMPAIGN } from '../../../starter-worlds/src/campaign';
@@ -27,6 +28,7 @@ const CLASSIFY: Record<string, Kind> = {
   [`${API}/worlds/:w/graph`]: 'filtered', [`${API}/worlds/:w/tree`]: 'filtered', [`${API}/worlds/:w/timeline`]: 'filtered',
   [`${API}/worlds/:w/timeline/events`]: 'author-only', [`${API}/worlds/:w/tiers`]: 'filtered', [`${API}/worlds/:w/tiers/:sid/ladder`]: 'filtered',
   [`${API}/worlds/:w/compare`]: 'filtered', [`${API}/worlds/:w/boards`]: 'filtered', [`${API}/worlds/:w/boards/:bid`]: 'filtered',
+  [`${API}/worlds/:w/export/:format`]: 'filtered',
   [`${API}/worlds/:w/categories`]: 'filtered', [`${API}/worlds/:w/health-report`]: 'author-only',
   [`${API}/worlds/:w/history/:ref`]: 'author-only', [`${API}/worlds/:w/history/:ref/diff`]: 'author-only',
   [`${API}/worlds/:w/assets/:name`]: 'skip', // content-addressed binary images; no text
@@ -96,6 +98,11 @@ for (const def of [SERIES, CAMPAIGN] as StarterWorld[]) {
           if (kind !== 'filtered' || !pattern.includes('/worlds/:w')) continue;
           const base = pattern.replace(':w', def.slug);
           if (base.includes(':ref')) for (const p of pages) for (const ref of [p.slug, p.id]) urls.push(base.replace(':ref', encodeURIComponent(ref)));
+          else if (base.includes(':format')) {
+            for (const f of ['json', 'markdown', 'html', 'site']) urls.push(base.replace(':format', f));
+            for (const t of new Set(def.pages.map((p) => p.type))) urls.push(base.replace(':format', 'csv') + `?type=${t}`);
+            for (const p of pages) urls.push(base.replace(':format', 'html') + `?page=${encodeURIComponent(p.slug)}`);
+          }
           else if (base.includes(':sid')) for (const t of def.world.tierSystems) for (const a of ['', ...def.world.arcs.map((x) => `?arc=${x.id}`)]) urls.push(base.replace(':sid', t.id) + a);
           else if (base.includes(':bid')) urls.push(base.replace(':bid', 'leak-board'));
           else if (base.endsWith('/tree')) urls.push(`${base}?field=region&type=location`, `${base}?kind=master_student`, `${base}?field=leaders&type=faction`);
@@ -107,6 +114,7 @@ for (const def of [SERIES, CAMPAIGN] as StarterWorld[]) {
         // compare + search/suggest need query params
         const extra = ['flame', 'core', 'sister', 'vault', 'key', 'ledger', 'furnace', 'syndicate', 'orrin', 'sable', 'quench', 'crown', 'bell', 'lighthouse', ...pass.secrets.flatMap((s) => s.split(' ').filter((w) => w.length > 5)), ...pass.titles];
         const all: string[] = [];
+        const labelled: Array<[string, string]> = [];
         const q = (extraQs: string) => [pass.qs, extraQs].filter(Boolean).join('&');
         for (const u of urls) {
           let qs = q('');
@@ -117,11 +125,13 @@ for (const def of [SERIES, CAMPAIGN] as StarterWorld[]) {
           }
           const res = await req('GET', u.includes('?') ? `${u}&${qs}` : `${u}${qs ? '?' + qs : ''}`);
           expect(res.statusCode, u).toBeLessThan(500);
-          all.push(decode(res.body));
+          const txt = /\/export\/(markdown|site)/.test(u) ? Object.entries(unzipSync(new Uint8Array(res.rawPayload))).map(([n, d]) => n + '\n' + decode(strFromU8(d))).join('\n') : decode(res.body);
+          all.push(txt);
+          labelled.push([u, txt]);
         }
         const text = all.join('\n');
         for (const s of [...pass.secrets, ...(def.eventSecrets ?? [])]) expect(text, `LEAK (text): ${s}`).not.toContain(s);
-        for (const t of pass.titles) expect(text, `LEAK (title with hideTitles): ${t}`).not.toContain(t);
+        for (const t of pass.titles) expect(text, `LEAK (title with hideTitles): ${t} in ${labelled.filter(([, x]) => x.includes(t)).map(([u]) => u).slice(0, 3).join(' | ')}`).not.toContain(t);
       });
     }
 

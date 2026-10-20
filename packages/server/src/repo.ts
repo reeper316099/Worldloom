@@ -10,7 +10,7 @@ import {
   type Board, type EntityType, type Page, type Relation, type TimelineEvent, type Revision, type World,
 } from '@worldloom/shared';
 import { JsonFile, atomicWrite, watchDir, withLock, zipBackup } from '@worldloom/jsonstore';
-import { escapeHtml, extractLinks, extractSection, redact, render, rewriteLinks, type LinkResolution, type RenderResult, type WikiLink } from '@worldloom/wikisyntax';
+import { escapeHtml, extractClaims, extractLinks, extractSection, redact, render, rewriteLinks, type LinkResolution, type RenderResult, type WikiLink } from '@worldloom/wikisyntax';
 import { ApiError, badRequest, conflict, notFound } from './errors';
 import { parsePageFile, serializePage, PageFileError } from './pagefile';
 import { defaultEntityTypes } from './seed';
@@ -18,6 +18,7 @@ import { SearchIndex, snippet, type SearchDoc } from './search';
 import { buildInfobox, infoboxHtml, resolveField, type Infobox } from './infobox';
 import { pageVisible, revealOk, type Viewer } from './visibility';
 import { breadcrumbs } from './visual';
+import type { ImportItem } from './transfer';
 import type { FSWatcher } from 'chokidar';
 
 const sha = (s: string) => crypto.createHash('sha1').update(s).digest('hex');
@@ -61,7 +62,11 @@ export class WorldRepo {
   private version = 0; // bumps on any page change
   private progressVersion = 0;
   private search = new SearchIndex();
-  private readerIdx = new Map<string, { stamp: string; idx: SearchIndex }>();
+  private readerIdx = new Map<string, { stamp: string; idx: SearchIndex; seq: number }>();
+  private seq = 0;
+  private changeLog: Array<[number, string]> = [];
+  private visVersion = 0; // bumps when anything that affects who can see what (reveal, dm-only, title, type) changes
+  private visSig = new Map<string, string>();
   private txs: Tx[] = [];
   private claimCache = new Map<string, { stamp: string; claims: RenderResult['claims']; citations: number }>();
   private watcher?: FSWatcher;
@@ -199,12 +204,25 @@ export class WorldRepo {
       this.nameSig.set(page.id, sig);
       this.namesDirty = true;
     }
+    const vsig = JSON.stringify([page.reveal, page.dmOnly, page.title, page.aliases, page.type, page.appliesTo, page.redirectsTo]);
+    if (this.visSig.get(page.id) !== vsig) {
+      this.visSig.set(page.id, vsig);
+      this.visVersion++;
+    }
+    this.touch(page.id);
     this.linkNames.set(page.id, this.computeLinkNames(page));
     this.search.upsert(this.searchDoc(page, page.body));
     this.version++;
     this.inboundCache = undefined;
   }
+  private touch(id: string) {
+    this.changeLog.push([++this.seq, id]);
+    if (this.changeLog.length > 20000) this.changeLog.splice(0, 10000);
+  }
   private dropMemory(id: string) {
+    this.visSig.delete(id);
+    this.visVersion++;
+    this.touch(id);
     this.pages.delete(id);
     this.nameSig.delete(id);
     this.linkNames.delete(id);
@@ -495,6 +513,54 @@ export class WorldRepo {
     await fs.rm(this.boardFile(id), { force: true });
   }
 
+  // ---------- import ----------
+  planImport(items: ImportItem[], mode: 'skip' | 'overwrite' | 'rename'): ImportItem[] {
+    return items.map((it) => {
+      if (it.action === 'skip' || !it.type || !this.types.some((t) => t.slug === it.type)) return { ...it, action: 'skip' };
+      const clash = [...this.pages.values()].some((p) => p.type === it.type && titleKey(p.title) === titleKey(it.title));
+      return { ...it, action: clash ? mode : 'create' };
+    });
+  }
+  /** Apply an import as one undoable transaction (a zip backup is taken first). */
+  async commitImport(items: ImportItem[], mode: 'skip' | 'overwrite' | 'rename') {
+    const plan = this.planImport(items, mode);
+    if (plan.some((i) => i.action !== 'skip')) await this.backup('pre-import');
+    const tx = this.beginTx(`import ${plan.length} pages`);
+    const result = { created: 0, updated: 0, skipped: 0, errors: [] as string[] };
+    for (const it of plan) {
+      if (it.action === 'skip') { result.skipped++; continue; }
+      try {
+        const fields = this.coerce(it.type, it.fields);
+        const now = new Date().toISOString();
+        if (it.action === 'overwrite') {
+          const cur = [...this.pages.values()].find((p) => p.type === it.type && titleKey(p.title) === titleKey(it.title))!;
+          await this.persist({ ...cur, aliases: it.aliases, tags: it.tags, status: it.status, fields, body: it.body, updatedAt: now }, tx, true, 'import (overwrite)');
+          result.updated++;
+          continue;
+        }
+        let title = it.title;
+        if (it.action === 'rename') for (let n = 2; [...this.pages.values()].some((p) => p.type === it.type && titleKey(p.title) === titleKey(title)); n++) title = `${it.title} (${n})`;
+        const page = PageMetaSchema.parse({ id: newId(), type: it.type, title, slug: this.uniqueSlug(it.type, slugify(title)), aliases: it.aliases, status: it.status, tags: it.tags, categories: [], fields, appliesTo: 'all', dmOnly: false, createdAt: now, updatedAt: now }) as Page;
+        page.body = it.body;
+        await this.persist(page, tx, true, 'imported');
+        result.created++;
+      } catch (e) {
+        result.errors.push(`${it.title}: ${(e as Error).message}`);
+      }
+    }
+    const txId = await this.commitTx(tx);
+    return { ...result, txId };
+  }
+  /** Restore pages from a JSON backup verbatim (ids preserved). Used for importing a backup into a fresh world. */
+  async restorePages(pages: Page[]) {
+    for (const p of pages) {
+      const parsed = PageMetaSchema.parse(p) as Page;
+      parsed.body = typeof p.body === 'string' ? p.body : '';
+      parsed.slug = this.uniqueSlug(parsed.type, parsed.slug, parsed.id);
+      await this.persist(parsed, undefined, false);
+    }
+  }
+
   /** Live preview of unsaved Markdown (author view) for the editor. */
   preview(body: string, pageId?: string, continuity?: string) {
     const base = pageId ? this.pages.get(pageId) : undefined;
@@ -577,17 +643,26 @@ export class WorldRepo {
     }
     return out + red.slice(pos);
   }
+  /** Reader search index, rebuilt only when visibility inputs change and otherwise updated incrementally per edited page. */
   private readerIndex(v: Viewer): SearchIndex {
     const key = `${v.player ? 'player' : 'reader'}:${v.hideTitles ? 'h' : 's'}`;
-    const stamp = `${this.version}:${this.progressVersion}`;
+    const stamp = `${this.progressVersion}:${this.visVersion}`;
     const hit = this.readerIdx.get(key);
-    if (hit?.stamp === stamp) return hit.idx;
-    const idx = new SearchIndex();
-    for (const p of this.pages.values()) {
-      if (!pageVisible(v, p)) continue;
-      idx.upsert(this.searchDoc(p, this.readerText(p, v)));
+    const add = (idx: SearchIndex, p: Page) => (pageVisible(v, p) ? idx.upsert(this.searchDoc(p, this.readerText(p, v))) : idx.remove(p.id));
+    if (hit?.stamp === stamp) {
+      if (hit.seq === this.seq) return hit.idx;
+      if (this.changeLog.length && this.changeLog[0]![0] <= hit.seq + 1) {
+        for (const id of new Set(this.changeLog.filter(([n]) => n > hit.seq).map(([, i]) => i))) {
+          const p = this.pages.get(id);
+          if (p) add(hit.idx, p); else hit.idx.remove(id);
+        }
+        hit.seq = this.seq;
+        return hit.idx;
+      }
     }
-    this.readerIdx.set(key, { stamp, idx });
+    const idx = new SearchIndex();
+    for (const p of this.pages.values()) if (pageVisible(v, p)) add(idx, p);
+    this.readerIdx.set(key, { stamp, idx, seq: this.seq });
     return idx;
   }
   searchPages(q: string, v: Viewer, limit = 25) {
@@ -1006,8 +1081,7 @@ export class WorldRepo {
       const stamp = sha(p.body);
       let c = this.claimCache.get(p.id);
       if (!c || c.stamp !== stamp) {
-        const r = render(p.body);
-        c = { stamp, claims: r.claims, citations: r.citations.length };
+        c = { stamp, claims: extractClaims(p.body) as RenderResult['claims'], citations: 0 };
         this.claimCache.set(p.id, c);
       }
       for (const cl of c.claims) if (!cl.cited || cl.kind === 'theory') unsourced.push({ id: p.id, title: p.title, slug: p.slug, kind: cl.kind, text: cl.text.slice(0, 120) });

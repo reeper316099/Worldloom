@@ -3,7 +3,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { EventEmitter } from 'node:events';
 import { z } from 'zod';
-import { DATA_DIR_ENV, WorldSchema, slugify, type World } from '@worldloom/shared';
+import { DATA_DIR_ENV, EntityTypesFileSchema, RelationsFileSchema, TimelineFileSchema, WorldSchema, slugify, type World } from '@worldloom/shared';
 import { JsonFile, zipBackup } from '@worldloom/jsonstore';
 import { WorldRepo, type RepoOptions } from './repo';
 import { badRequest, conflict, notFound } from './errors';
@@ -120,6 +120,26 @@ export class WorldManager {
       const pack = BUILTIN_PACKS[input.pack];
       if (!pack) throw badRequest(`unknown type pack "${input.pack}"`);
       await repo.setTypes(pack.types);
+    }
+    return repo;
+  }
+  /** Create a new world from a Worldloom JSON backup. */
+  async importBackup(backup: unknown, name?: string) {
+    const b = backup as { format?: string; version?: number; world?: unknown; types?: unknown; pages?: unknown; relations?: unknown; timeline?: unknown };
+    if (!b || b.format !== 'worldloom-backup' || b.version !== 1) throw badRequest('not a Worldloom backup (format/version mismatch)');
+    const parsed = WorldSchema.safeParse({ ...(b.world as object), slug: 'imported', createdAt: new Date().toISOString() });
+    if (!parsed.success) throw badRequest(`backup world config is invalid: ${parsed.error.issues[0]?.message}`);
+    const w = parsed.data;
+    const repo = await this.create({ name: name ?? `${w.name} (imported)`, description: w.description, accent: w.accent, continuities: w.continuities, sources: w.sources });
+    try {
+      await repo.updateWorld((x) => { x.arcs = w.arcs; x.tierSystems = w.tierSystems; x.theme = w.theme; x.progress = w.progress; });
+      await repo.setTypes(EntityTypesFileSchema.parse({ types: b.types }).types);
+      await repo.restorePages(z.array(z.any()).parse(b.pages ?? []));
+      await repo.relationsFile.save(RelationsFileSchema.parse({ relations: b.relations ?? [] }));
+      await repo.setTimeline(TimelineFileSchema.parse({ events: b.timeline ?? [] }).events);
+    } catch (e) {
+      await this.remove(repo.slug);
+      throw badRequest(`backup could not be imported: ${(e as Error).message.slice(0, 300)}`);
     }
     return repo;
   }

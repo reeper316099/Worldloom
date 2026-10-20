@@ -9,6 +9,7 @@ import {
 import { WorldManager, SettingsSchema, defaultDataDir } from './manager';
 import { ApiError, badRequest } from './errors';
 import { BUILTIN_PACKS } from './packs';
+import { exportCsv, exportHtmlPage, exportHtmlWorld, exportJson, exportMarkdownZip, exportSiteZip, exportViewer, parseCsvImport, parseMarkdownFiles } from './transfer';
 import { buildGraph, buildLadder, buildTimeline, buildTree, compareMany, listTierSystems } from './visual';
 import { readAsset, storeAsset, MAX_ASSET_BYTES } from './assets';
 import type { WorldRepo } from './repo';
@@ -332,6 +333,48 @@ export async function buildApp({ token, manager, log }: AppOptions): Promise<Fas
   app.delete(`${W}/boards/:bid`, async (req, reply) => {
     await (await repo(req)).deleteBoard((req.params as { bid: string }).bid);
     reply.status(204);
+  });
+  // ----- export / import -----
+  app.get(`${W}/export/:format`, async (req, reply) => {
+    const rp = await repo(req);
+    const { format } = req.params as { format: string };
+    const q = parse(z.object({ spoilers: z.enum(['0', '1']).default('0'), player: z.enum(['0', '1']).default('0'), type: z.string().optional(), page: z.string().optional() }), req.query);
+    const v = exportViewer(rp, { spoilers: q.spoilers === '1', player: q.player === '1' });
+    const send = (type: string, name: string, body: string | Uint8Array) => reply.header('Content-Type', type).header('Content-Disposition', `attachment; filename="${name}"`).send(typeof body === 'string' ? body : Buffer.from(body));
+    switch (format) {
+      case 'json': return send('application/json', `${rp.slug}-backup.json`, JSON.stringify(exportJson(rp, v), null, 2));
+      case 'markdown': return send('application/zip', `${rp.slug}-vault.zip`, exportMarkdownZip(rp, v));
+      case 'csv': if (!q.type) throw badRequest('type is required'); return send('text/csv; charset=utf-8', `${rp.slug}-${q.type}.csv`, exportCsv(rp, v, q.type));
+      case 'html': return send('text/html; charset=utf-8', `${rp.slug}${q.page ? '-' + q.page : ''}.html`, q.page ? exportHtmlPage(rp, v, q.page) : exportHtmlWorld(rp, v));
+      case 'site': return send('application/zip', `${rp.slug}-site.zip`, exportSiteZip(rp, v));
+      default: throw badRequest('unknown export format');
+    }
+  });
+  const ImportBody = z.object({
+    format: z.enum(['markdown', 'csv']), files: z.array(z.object({ path: z.string().max(500), text: z.string().max(5_000_000) })).min(1).max(5000),
+    type: z.string().optional(), mode: z.enum(['skip', 'overwrite', 'rename']).default('skip'),
+  });
+  const planImport = (rp: WorldRepo, b: z.infer<typeof ImportBody>) => {
+    const items = b.format === 'csv' ? parseCsvImport(b.files[0]!.text, rp.types, b.type ?? '') : parseMarkdownFiles(b.files, rp.types, b.type);
+    return rp.planImport(items, b.mode);
+  };
+  app.post(`${W}/import/preview`, { bodyLimit: 64 * 1024 * 1024 }, async (req) => {
+    const rp = await repo(req);
+    const items = planImport(rp, parse(ImportBody, req.body));
+    const count = (a: string) => items.filter((i) => i.action === a).length;
+    return { counts: { create: count('create'), overwrite: count('overwrite'), rename: count('rename'), skip: count('skip') }, items: items.slice(0, 500).map((i) => ({ title: i.title, type: i.type, action: i.action, source: i.source, warnings: i.warnings })) };
+  });
+  app.post(`${W}/import/commit`, { bodyLimit: 64 * 1024 * 1024 }, async (req) => {
+    const rp = await repo(req);
+    const b = parse(ImportBody, req.body);
+    const items = b.format === 'csv' ? parseCsvImport(b.files[0]!.text, rp.types, b.type ?? '') : parseMarkdownFiles(b.files, rp.types, b.type);
+    return rp.commitImport(items, b.mode);
+  });
+  app.post(`${r}/import/backup`, { bodyLimit: 128 * 1024 * 1024 }, async (req, reply) => {
+    const b = parse(z.object({ backup: z.unknown(), name: z.string().optional() }), req.body);
+    const created = await manager.importBackup(b.backup, b.name);
+    reply.status(201);
+    return created.world;
   });
   app.get(`${W}/categories`, async (req) => {
     const rp = await repo(req);

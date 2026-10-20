@@ -285,6 +285,7 @@ export function render(source: string, o: RenderOptions = {}): RenderResult {
  * Uses the same visibility rules as `render`.
  */
 export function redact(source: string, o: Pick<RenderOptions, 'continuity' | 'isRevealed' | 'hideDm'>): string {
+  if (!source.includes(':::')) return source; // no directive blocks: nothing to withhold, skip the Markdown parse
   const tree = parser.parse(source) as Root;
   const ranges: Array<[number, number]> = [];
   let b = 0;
