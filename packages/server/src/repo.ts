@@ -5,18 +5,19 @@ import { EventEmitter } from 'node:events';
 import { diffLines } from 'diff';
 import { z } from 'zod';
 import {
-  EntityTypesFileSchema, RelationsFileSchema, revealSatisfied, WorldSchema, PageMetaSchema, RevisionSchema, WORLD_SCHEMA_VERSION,
+  EntityTypesFileSchema, RelationsFileSchema, TimelineFileSchema, BoardSchema, revealSatisfied, WorldSchema, PageMetaSchema, RevisionSchema, WORLD_SCHEMA_VERSION,
   coerceFields, FieldError, slugify, titleKey,
-  type EntityType, type Page, type Relation, type Revision, type World,
+  type Board, type EntityType, type Page, type Relation, type TimelineEvent, type Revision, type World,
 } from '@worldloom/shared';
 import { JsonFile, atomicWrite, watchDir, withLock, zipBackup } from '@worldloom/jsonstore';
 import { escapeHtml, extractLinks, extractSection, redact, render, rewriteLinks, type LinkResolution, type RenderResult, type WikiLink } from '@worldloom/wikisyntax';
-import { badRequest, conflict, notFound } from './errors';
+import { ApiError, badRequest, conflict, notFound } from './errors';
 import { parsePageFile, serializePage, PageFileError } from './pagefile';
 import { defaultEntityTypes } from './seed';
 import { SearchIndex, snippet, type SearchDoc } from './search';
 import { buildInfobox, infoboxHtml, resolveField, type Infobox } from './infobox';
 import { pageVisible, revealOk, type Viewer } from './visibility';
+import { breadcrumbs } from './visual';
 import type { FSWatcher } from 'chokidar';
 
 const sha = (s: string) => crypto.createHash('sha1').update(s).digest('hex');
@@ -47,6 +48,7 @@ export class WorldRepo {
   private worldFile!: JsonFile<World>;
   private typesFile!: JsonFile<z.infer<typeof EntityTypesFileSchema>>;
   relationsFile!: JsonFile<z.infer<typeof RelationsFileSchema>>;
+  timelineFile!: JsonFile<z.infer<typeof TimelineFileSchema>>;
   private fileOf = new Map<string, string>(); // id -> abs file
   private idOf = new Map<string, string>(); // abs file -> id
   private hashOf = new Map<string, string>(); // abs file -> content hash
@@ -89,7 +91,11 @@ export class WorldRepo {
     });
     this.world = await this.worldFile.load();
     this.types = (await this.typesFile.load()).types;
+    this.timelineFile = new JsonFile(this.p('timeline.json'), {
+      schema: TimelineFileSchema, version: 1, backupDir, defaults: () => ({ schemaVersion: 1, events: [] }),
+    });
     await this.relationsFile.load();
+    await this.timelineFile.load();
     await fs.mkdir(this.p('pages'), { recursive: true });
     for (const f of await this.scanPages()) await this.ingestFile(f, true);
     if (this.opts.watch) this.startWatching();
@@ -352,7 +358,7 @@ export class WorldRepo {
       id: p.id, title: p.title, slug: p.slug, type: p.type, typeName: t?.name ?? p.type, status: p.status,
       aliases: p.aliases, tags: p.tags, categories: this.categoriesOf(p), appliesTo: p.appliesTo,
       appliesToSelected: continuity === undefined || p.appliesTo === 'all' || p.appliesTo.includes(continuity),
-      redirectsTo: p.redirectsTo, dmOnly: p.dmOnly, reveal: v.mode === 'author' ? p.reveal : undefined,
+      breadcrumbs: breadcrumbs(this, p, v), redirectsTo: p.redirectsTo, dmOnly: p.dmOnly, reveal: v.mode === 'author' ? p.reveal : undefined,
       html: r.html, headings: r.headings, infobox, claims: r.claims, hiddenBlocks: v.mode === 'author' ? [] : r.hiddenBlocks.length,
       createdAt: p.createdAt, updatedAt: p.updatedAt,
     };
@@ -413,8 +419,80 @@ export class WorldRepo {
     return {
       ...w,
       arcs: w.arcs.map((a) => (revealSatisfied({ arcId: a.id }, eff) || w.progress.showAll ? a : { ...a, name: '???', summary: '', ranges: {} })),
-      tierSystems: w.tierSystems.filter((t) => !t.reveal || revealOk(v, t.reveal)).map((t) => ({ ...t, tiers: t.tiers })),
+      tierSystems: w.tierSystems.filter((t) => !t.reveal || revealOk(v, t.reveal)).map((t) => ({ ...t, tiers: t.tiers.filter((x) => !x.reveal || revealOk(v, x.reveal)) })),
     };
+  }
+
+  async setTimeline(events: TimelineEvent[]) {
+    const ids = events.map((e) => e.id);
+    if (new Set(ids).size !== ids.length) throw badRequest('duplicate event ids');
+    for (const e of events) for (const id of e.pageIds) if (!this.pages.has(id)) throw badRequest(`event "${e.title}" references an unknown page`);
+    await this.timelineFile.save({ schemaVersion: 1, events });
+    this.version++;
+    return events;
+  }
+
+  // ---------- boards (tier lists) ----------
+  private boardFile(id: string) {
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id)) throw notFound('board');
+    return this.p('boards', `${id}.json`);
+  }
+  async listBoards(v: Viewer) {
+    let files: string[] = [];
+    try {
+      files = (await fs.readdir(this.p('boards'))).filter((f) => f.endsWith('.json'));
+    } catch {
+      return [];
+    }
+    const out = [];
+    for (const f of files) {
+      const b = BoardSchema.safeParse(JSON.parse(await fs.readFile(this.p('boards', f), 'utf8')));
+      if (!b.success) continue;
+      const vis = this.boardView(b.data, v);
+      out.push({ id: b.data.id, name: b.data.name, items: Object.values(vis.placements).flat().length + vis.pool.length, updatedAt: b.data.updatedAt, context: b.data.context });
+    }
+    return out.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  }
+  async readBoard(id: string): Promise<Board> {
+    try {
+      return BoardSchema.parse(JSON.parse(await fs.readFile(this.boardFile(id), 'utf8')));
+    } catch (e) {
+      if (e instanceof ApiError) throw e;
+      throw notFound('board');
+    }
+  }
+  /** Spoiler-filtered board: placements of pages the viewer can't see are removed; `items` carries display data. */
+  boardView(b: Board, v: Viewer) {
+    const vis = (id: string) => { const p = this.pages.get(id); return p && pageVisible(v, p) ? p : undefined; };
+    const placements = Object.fromEntries(Object.entries(b.placements).map(([t, ids]) => [t, ids.filter((i) => vis(i))]));
+    const pool = b.pool.filter((i) => vis(i));
+    const items: Record<string, { title: string; slug: string; type: string }> = {};
+    for (const id of [...Object.values(placements).flat(), ...pool]) { const p = vis(id)!; items[id] = { title: p.title, slug: p.slug, type: p.type }; }
+    return { ...b, placements, pool, items };
+  }
+  async saveBoard(input: Omit<Board, 'createdAt' | 'updatedAt'> & { createdAt?: string }, v: Viewer): Promise<Board> {
+    let prev: Board | undefined;
+    try { prev = await this.readBoard(input.id); } catch { /* new board */ }
+    const now = new Date().toISOString();
+    const board = BoardSchema.parse({ ...input, createdAt: prev?.createdAt ?? now, updatedAt: now });
+    for (const id of [...Object.values(board.placements).flat(), ...board.pool]) {
+      const p = this.pages.get(id);
+      if (!p || !pageVisible(v, p)) throw badRequest('board references an unknown or unavailable page');
+    }
+    if (prev) { // keep placements the viewer cannot see (they were filtered out of what the client received)
+      const hidden = (id: string) => { const p = this.pages.get(id); return !!p && !pageVisible(v, p); };
+      for (const [t, ids] of Object.entries(prev.placements)) {
+        const keep = ids.filter(hidden);
+        if (keep.length && board.tiers.some((x) => x.id === t)) board.placements[t] = [...(board.placements[t] ?? []), ...keep];
+      }
+      board.pool.push(...prev.pool.filter(hidden));
+    }
+    await atomicWrite(this.boardFile(board.id), JSON.stringify(board, null, 2) + '\n');
+    return board;
+  }
+  async deleteBoard(id: string) {
+    await this.readBoard(id);
+    await fs.rm(this.boardFile(id), { force: true });
   }
 
   /** Live preview of unsaved Markdown (author view) for the editor. */

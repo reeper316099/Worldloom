@@ -21,7 +21,21 @@ export interface RelationDef {
   continuityIds?: string[];
   timeSpan?: { fromArcId?: string; toArcId?: string };
 }
+export interface TimelineDef {
+  id: string;
+  title: string;
+  summary?: string;
+  pages?: string[]; // page titles
+  order: number;
+  label?: string;
+  trackId?: string | null;
+  arcId?: string;
+  reveal?: Reveal;
+}
 export interface StarterWorld {
+  timeline?: TimelineDef[];
+  /** Strings that appear only in gated timeline events. */
+  eventSecrets?: string[];
   slug: string;
   world: Omit<World, 'createdAt' | 'schemaVersion'>;
   pack: string; // built-in pack id

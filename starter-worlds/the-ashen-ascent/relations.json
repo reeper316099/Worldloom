@@ -21,10 +21,11 @@
       "toId": "st_character_mira-ashgrove"
     },
     {
-      "fromId": "st_character_orrin-vale",
+      "fromId": "st_character_kael-marrow",
       "id": "r3",
       "kind": "master_student",
-      "toId": "st_character_kael-marrow"
+      "label": "student of",
+      "toId": "st_character_orrin-vale"
     },
     {
       "fromId": "st_character_kael-marrow",

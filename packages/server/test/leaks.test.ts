@@ -24,12 +24,16 @@ const CLASSIFY: Record<string, Kind> = {
   [`${API}/worlds/:w/pages/:ref/compare`]: 'filtered', [`${API}/worlds/:w/pages/:ref/raw`]: 'author-only',
   [`${API}/worlds/:w/search`]: 'filtered', [`${API}/worlds/:w/suggest`]: 'filtered', [`${API}/worlds/:w/backlinks/:ref`]: 'filtered',
   [`${API}/worlds/:w/relations`]: 'filtered', [`${API}/worlds/:w/relations/explicit`]: 'author-only', [`${API}/worlds/:w/card/:ref`]: 'filtered',
+  [`${API}/worlds/:w/graph`]: 'filtered', [`${API}/worlds/:w/tree`]: 'filtered', [`${API}/worlds/:w/timeline`]: 'filtered',
+  [`${API}/worlds/:w/timeline/events`]: 'author-only', [`${API}/worlds/:w/tiers`]: 'filtered', [`${API}/worlds/:w/tiers/:sid/ladder`]: 'filtered',
+  [`${API}/worlds/:w/compare`]: 'filtered', [`${API}/worlds/:w/boards`]: 'filtered', [`${API}/worlds/:w/boards/:bid`]: 'filtered',
   [`${API}/worlds/:w/categories`]: 'filtered', [`${API}/worlds/:w/health-report`]: 'author-only',
   [`${API}/worlds/:w/history/:ref`]: 'author-only', [`${API}/worlds/:w/history/:ref/diff`]: 'author-only',
   [`${API}/worlds/:w/assets/:name`]: 'skip', // content-addressed binary images; no text
 };
 
 let dir: string, app: FastifyInstance, manager: WorldManager;
+const pageIdOf = (type: string, title: string) => `st_${type}_${title.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
 const decode = (s: string) => s.replace(/&#x([0-9a-f]+);/gi, (_, h: string) => String.fromCodePoint(parseInt(h, 16))).replace(/&#(\d+);/g, (_, d: string) => String.fromCodePoint(Number(d))).replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
 const req = (method: 'GET' | 'PUT', url: string, body?: unknown) => app.inject({ method, url, headers: { authorization: 'Bearer t' }, payload: body as object });
 
@@ -55,6 +59,7 @@ describe('route classification', () => {
     // POST/PUT/PATCH responses echo author-owned data; read-like POSTs must be author-gated
     const readLike = writes.filter((w) => /render|compare|diff/.test(w));
     expect(readLike).toEqual([`POST ${API}/worlds/:w/render`]);
+    // boards PUT filters its response per viewer (see boardView) and never echoes hidden pages
   });
 });
 
@@ -70,6 +75,9 @@ for (const def of [SERIES, CAMPAIGN] as StarterWorld[]) {
       await manager.settingsFile.save({ ...manager.settings, hideTitles: true });
       const r = await req('GET', `${W}/pages?mode=author&limit=1000`);
       pages = r.json().items;
+      const ids = pages.slice(0, 6).map((p) => p.id).concat(def.pages.filter((p) => p.reveal || p.dmOnly).map((p) => pageIdOf(p.type, p.title)));
+      const put = await req('PUT', `${W}/boards/leak-board?mode=author`, { name: 'Leak board', tiers: [{ id: 's', label: 'S', color: '#f00' }, { id: 'a', label: 'A', color: '#0f0' }], placements: { s: ids.slice(0, 4), a: ids.slice(4, 8) }, pool: ids.slice(8) });
+      expect(put.statusCode, put.body).toBe(200);
     });
     afterAll(async () => {
       await manager.settingsFile.save({ ...manager.settings, hideTitles: false });
@@ -82,10 +90,18 @@ for (const def of [SERIES, CAMPAIGN] as StarterWorld[]) {
     for (const pass of passes) {
       it(`no gated text from any filtered route (${pass.name})`, async () => {
         const urls: string[] = [];
+        const hiddenIds = def.pages.filter((p) => p.reveal || p.dmOnly).map((p) => pageIdOf(p.type, p.title));
+        const someIds = pages.slice(0, 5).map((p) => p.id);
         for (const [pattern, kind] of Object.entries(CLASSIFY)) {
           if (kind !== 'filtered' || !pattern.includes('/worlds/:w')) continue;
           const base = pattern.replace(':w', def.slug);
           if (base.includes(':ref')) for (const p of pages) for (const ref of [p.slug, p.id]) urls.push(base.replace(':ref', encodeURIComponent(ref)));
+          else if (base.includes(':sid')) for (const t of def.world.tierSystems) for (const a of ['', ...def.world.arcs.map((x) => `?arc=${x.id}`)]) urls.push(base.replace(':sid', t.id) + a);
+          else if (base.includes(':bid')) urls.push(base.replace(':bid', 'leak-board'));
+          else if (base.endsWith('/tree')) urls.push(`${base}?field=region&type=location`, `${base}?kind=master_student`, `${base}?field=leaders&type=faction`);
+          else if (base.endsWith('/compare')) { urls.push(`${base}?ids=${someIds.join(',')}`); for (const h of hiddenIds) urls.push(`${base}?ids=${h},${someIds[0]}`); }
+          else if (base.endsWith('/graph')) { urls.push(base); for (const p of pages) urls.push(`${base}?focus=${encodeURIComponent(p.slug)}&hops=3`); }
+          else if (base.endsWith('/timeline')) { urls.push(base); for (const p of pages) urls.push(`${base}?page=${encodeURIComponent(p.slug)}`); }
           else urls.push(base);
         }
         // compare + search/suggest need query params
@@ -94,17 +110,17 @@ for (const def of [SERIES, CAMPAIGN] as StarterWorld[]) {
         const q = (extraQs: string) => [pass.qs, extraQs].filter(Boolean).join('&');
         for (const u of urls) {
           let qs = q('');
-          if (u.endsWith('/compare')) qs = q(`a=${def.world.continuities[0]!.id}&b=${def.world.continuities.at(-1)!.id}`);
+          if (/\/pages\/[^/]+\/compare$/.test(u)) qs = q(`a=${def.world.continuities[0]!.id}&b=${def.world.continuities.at(-1)!.id}`);
           if (u.endsWith('/search') || u.endsWith('/suggest')) {
             for (const term of extra) all.push(decode((await req('GET', `${u}?${q('q=' + encodeURIComponent(term))}`)).body));
             continue;
           }
-          const res = await req('GET', `${u}${qs ? '?' + qs : ''}`);
+          const res = await req('GET', u.includes('?') ? `${u}&${qs}` : `${u}${qs ? '?' + qs : ''}`);
           expect(res.statusCode, u).toBeLessThan(500);
           all.push(decode(res.body));
         }
         const text = all.join('\n');
-        for (const s of pass.secrets) expect(text, `LEAK (text): ${s}`).not.toContain(s);
+        for (const s of [...pass.secrets, ...(def.eventSecrets ?? [])]) expect(text, `LEAK (text): ${s}`).not.toContain(s);
         for (const t of pass.titles) expect(text, `LEAK (title with hideTitles): ${t}`).not.toContain(t);
       });
     }
@@ -112,7 +128,7 @@ for (const def of [SERIES, CAMPAIGN] as StarterWorld[]) {
     it('author-only routes refuse readers', async () => {
       for (const [pattern, kind] of Object.entries(CLASSIFY)) {
         if (kind !== 'author-only') continue;
-        const u = pattern.replace(':w', def.slug).replace(':ref', pages[0]!.slug);
+        const u = pattern.replace(':w', def.slug).replace(':ref', pages[0]!.slug).replace(':sid', 'x');
         for (const qs of ['?from=x', '?mode=reader&from=x', '?mode=reader&player=1&from=x&to=current']) expect((await req('GET', u + qs)).statusCode, u + qs).toBe(403);
       }
     });

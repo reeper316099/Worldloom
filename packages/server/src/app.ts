@@ -3,12 +3,13 @@ import path from 'node:path';
 import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
 import { z, ZodError } from 'zod';
 import {
-  API_PREFIX, ArcSchema, RelationSchema, RevealSchema, ContinuitySchema, EntityTypeSchema, TypePackSchema, PageCreateSchema, PagePatchSchema, ProgressSchema, SourceSchema,
+  API_PREFIX, ArcSchema, BoardSchema, RelationSchema, RevealSchema, TimelineEventSchema, ContinuitySchema, EntityTypeSchema, TypePackSchema, PageCreateSchema, PagePatchSchema, ProgressSchema, SourceSchema,
   type Progress,
 } from '@worldloom/shared';
 import { WorldManager, SettingsSchema, defaultDataDir } from './manager';
 import { ApiError, badRequest } from './errors';
 import { BUILTIN_PACKS } from './packs';
+import { buildGraph, buildLadder, buildTimeline, buildTree, compareMany, listTierSystems } from './visual';
 import { readAsset, storeAsset, MAX_ASSET_BYTES } from './assets';
 import type { WorldRepo } from './repo';
 
@@ -275,6 +276,62 @@ export async function buildApp({ token, manager, log }: AppOptions): Promise<Fas
     const rp = await repo(req);
     const q = parse(ModeQ, req.query);
     return rp.card((req.params as { ref: string }).ref, viewerOf(rp, q), q.cont);
+  });
+  // ----- visual tools -----
+  const csv = (s?: string) => (s ? s.split(',').map((x) => x.trim()).filter(Boolean) : undefined);
+  app.get(`${W}/graph`, async (req) => {
+    const rp = await repo(req);
+    const q = parse(ModeQ.extend({ types: z.string().optional(), kinds: z.string().optional(), focus: z.string().optional(), hops: z.coerce.number().int().min(1).max(6).optional(), arc: z.string().optional() }), req.query);
+    return buildGraph(rp, viewerOf(rp, q), { cont: q.cont, types: csv(q.types), kinds: csv(q.kinds), focus: q.focus, hops: q.hops, arc: q.arc });
+  });
+  app.get(`${W}/tree`, async (req) => {
+    const rp = await repo(req);
+    const q = parse(ModeQ.extend({ type: z.string().optional(), field: z.string().optional(), kind: z.string().optional(), parent: z.enum(['from', 'to']).optional(), root: z.string().optional() }), req.query);
+    if (!q.field && !q.kind) throw badRequest('field or kind is required');
+    return buildTree(rp, viewerOf(rp, q), q);
+  });
+  app.get(`${W}/timeline`, async (req) => {
+    const rp = await repo(req);
+    const q = parse(ModeQ.extend({ arc: z.string().optional(), page: z.string().optional() }), req.query);
+    return buildTimeline(rp, viewerOf(rp, q), q);
+  });
+  app.get(`${W}/timeline/events`, async (req) => {
+    authorOnly(parse(ModeQ, req.query));
+    return (await repo(req)).timelineFile.get()?.events ?? [];
+  });
+  app.put(`${W}/timeline/events`, async (req) => (await repo(req)).setTimeline(parse(z.array(TimelineEventSchema), req.body)));
+  app.get(`${W}/tiers`, async (req) => {
+    const rp = await repo(req);
+    return listTierSystems(rp, viewerOf(rp, parse(ModeQ, req.query)));
+  });
+  app.get(`${W}/tiers/:sid/ladder`, async (req) => {
+    const rp = await repo(req);
+    const q = parse(ModeQ.extend({ arc: z.string().optional() }), req.query);
+    return buildLadder(rp, viewerOf(rp, q), (req.params as { sid: string }).sid, { cont: q.cont, arc: q.arc });
+  });
+  app.get(`${W}/compare`, async (req) => {
+    const rp = await repo(req);
+    const q = parse(ModeQ.extend({ ids: z.string().min(1) }), req.query);
+    return compareMany(rp, viewerOf(rp, q), csv(q.ids) ?? [], q.cont);
+  });
+  app.get(`${W}/boards`, async (req) => {
+    const rp = await repo(req);
+    return rp.listBoards(viewerOf(rp, parse(ModeQ, req.query)));
+  });
+  app.get(`${W}/boards/:bid`, async (req) => {
+    const rp = await repo(req);
+    return rp.boardView(await rp.readBoard((req.params as { bid: string }).bid), viewerOf(rp, parse(ModeQ, req.query)));
+  });
+  app.put(`${W}/boards/:bid`, async (req) => {
+    const rp = await repo(req);
+    const q = parse(ModeQ, req.query);
+    const b = parse(BoardSchema.omit({ createdAt: true, updatedAt: true }), { ...(req.body as object), id: (req.params as { bid: string }).bid });
+    const saved = await rp.saveBoard(b, viewerOf(rp, q));
+    return rp.boardView(saved, viewerOf(rp, q));
+  });
+  app.delete(`${W}/boards/:bid`, async (req, reply) => {
+    await (await repo(req)).deleteBoard((req.params as { bid: string }).bid);
+    reply.status(204);
   });
   app.get(`${W}/categories`, async (req) => {
     const rp = await repo(req);

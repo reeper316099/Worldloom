@@ -39,6 +39,11 @@ export async function buildWorld(w: StarterWorld, outDir: string) {
     return { id: `r${i + 1}`, fromId: from, toId: to, kind: r.kind, label: r.label, reveal: r.reveal, timeSpan: r.timeSpan, continuityIds: r.continuityIds };
   });
   await write(path.join(outDir, 'relations.json'), stableStringify({ schemaVersion: 1, relations }));
+  const events = (w.timeline ?? []).map((e) => ({
+    id: e.id, title: e.title, summary: e.summary ?? '', order: e.order, label: e.label, trackId: e.trackId ?? null, arcId: e.arcId, reveal: e.reveal,
+    pageIds: (e.pages ?? []).map((t) => { const id = byTitle.get(t); if (!id) throw new Error(`timeline event "${e.title}" references unknown page ${t}`); return id; }),
+  }));
+  await write(path.join(outDir, 'timeline.json'), stableStringify({ schemaVersion: 1, events }));
 }
 
 async function write(file: string, text: string) {

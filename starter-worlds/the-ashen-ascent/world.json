@@ -223,7 +223,11 @@
           "description": "Final realm.",
           "id": "zenith",
           "name": "Zenith",
-          "order": 7
+          "order": 7,
+          "reveal": {
+            "at": 250,
+            "sourceId": "wn"
+          }
         }
       ]
     }

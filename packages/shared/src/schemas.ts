@@ -57,6 +57,7 @@ export const TierSystemSchema = z.object({
       order: z.number(),
       description: z.string().default(''),
       color: z.string().optional(),
+      reveal: RevealSchema.optional(),
     }),
   ),
   reveal: RevealSchema.optional(),
@@ -202,3 +203,31 @@ export const TypePackSchema = z.object({
   types: z.array(EntityTypeSchema).min(1),
 });
 export type TypePack = z.infer<typeof TypePackSchema>;
+
+/** Timeline event. `order` is the position on the in-world axis; `trackId` limits it to one continuity (null = all). */
+export const TimelineEventSchema = z.object({
+  id,
+  title: z.string().min(1),
+  summary: z.string().default(''),
+  pageIds: z.array(z.string()).default([]),
+  order: z.number(),
+  label: z.string().optional(),
+  trackId: z.string().nullable().default(null),
+  arcId: z.string().optional(),
+  reveal: RevealSchema.optional(),
+});
+export type TimelineEvent = z.infer<typeof TimelineEventSchema>;
+export const TimelineFileSchema = z.object({ schemaVersion: z.number().default(1), events: z.array(TimelineEventSchema).default([]) });
+
+/** Saved tier list ("strongest at the end of Arc 6"). */
+export const BoardSchema = z.object({
+  id: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+  name: z.string().min(1),
+  tiers: z.array(z.object({ id: z.string(), label: z.string(), color: z.string().default('#7c5cff') })).min(1),
+  placements: z.record(z.array(z.string())).default({}),
+  pool: z.array(z.string()).default([]),
+  context: z.object({ arcId: z.string().optional(), continuityId: z.string().optional(), note: z.string().default('') }).default({}),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type Board = z.infer<typeof BoardSchema>;

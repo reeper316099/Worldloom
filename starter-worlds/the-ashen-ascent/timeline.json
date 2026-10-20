@@ -1,0 +1,129 @@
+{
+  "events": [
+    {
+      "arcId": "a1",
+      "id": "ev-cold-fires",
+      "label": "Year 0",
+      "order": 0,
+      "pageIds": [
+        "st_event_night-of-cold-fires",
+        "st_character_kael-marrow"
+      ],
+      "summary": "Half of Ashmere burns with colorless flame.",
+      "title": "Night of Cold Fires",
+      "trackId": null
+    },
+    {
+      "arcId": "a2",
+      "id": "ev-trials",
+      "label": "Year 3",
+      "order": 3,
+      "pageIds": [
+        "st_character_kael-marrow",
+        "st_faction_cinder-guild"
+      ],
+      "summary": "Kael registers with the Cinder Guild.",
+      "title": "Kael enters the guild trials",
+      "trackId": null
+    },
+    {
+      "arcId": "a2",
+      "id": "ev-final",
+      "label": "Year 4",
+      "order": 4,
+      "pageIds": [
+        "st_character_kael-marrow",
+        "st_character_ilex-thorne",
+        "st_location_lantern-hall"
+      ],
+      "summary": "The trial final.",
+      "title": "Kael faces Ilex in Lantern Hall",
+      "trackId": null
+    },
+    {
+      "arcId": "a3",
+      "id": "ev-siege",
+      "label": "Year 6",
+      "order": 6,
+      "pageIds": [
+        "st_event_siege-of-keld-pass",
+        "st_character_brannoch-keld"
+      ],
+      "summary": "The garrison is cut off.",
+      "title": "Siege of Keld Pass begins",
+      "trackId": null
+    },
+    {
+      "arcId": "a3",
+      "id": "ev-orrin-wn",
+      "label": "Year 6",
+      "order": 6.5,
+      "pageIds": [
+        "st_character_orrin-vale"
+      ],
+      "reveal": {
+        "at": 140,
+        "sourceId": "wn"
+      },
+      "summary": "Orrin Vale falls at the Siege of Keld Pass.",
+      "title": "Orrin Vale falls at Keld Pass",
+      "trackId": "wn"
+    },
+    {
+      "arcId": "a3",
+      "id": "ev-orrin-adapt",
+      "label": "Year 6",
+      "order": 6.5,
+      "pageIds": [
+        "st_character_orrin-vale"
+      ],
+      "summary": "In the adaptation he survives the siege.",
+      "title": "Orrin retires to Ashmere",
+      "trackId": "adapt"
+    },
+    {
+      "arcId": "a4",
+      "id": "ev-sable",
+      "label": "Year 7",
+      "order": 7,
+      "pageIds": [
+        "st_character_sable"
+      ],
+      "reveal": {
+        "arcId": "a4"
+      },
+      "summary": "A masked figure leaves cold fires.",
+      "title": "Sable first seen at the border",
+      "trackId": null
+    },
+    {
+      "arcId": "a4",
+      "id": "ev-furnace",
+      "label": "Year 8",
+      "order": 8,
+      "pageIds": [
+        "st_character_kael-marrow",
+        "st_location_the-cold-furnace"
+      ],
+      "summary": "Kael meets Sable.",
+      "title": "Kael descends into the Cold Furnace",
+      "trackId": null
+    },
+    {
+      "arcId": "a5",
+      "id": "ev-quench",
+      "label": "Year 9",
+      "order": 9,
+      "pageIds": [
+        "st_event_the-great-quench"
+      ],
+      "reveal": {
+        "arcId": "a5"
+      },
+      "summary": "The Great Quench was staged by the Ember Ledger.",
+      "title": "The Great Quench",
+      "trackId": null
+    }
+  ],
+  "schemaVersion": 1
+}

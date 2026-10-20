@@ -37,6 +37,13 @@ fields:
       at: 100
     byContinuity:
       adapt: Ember
+    history:
+      - arcId: a1
+        value: Spark
+      - arcId: a2
+        value: Ember
+      - arcId: a3
+        value: Cinder
 createdAt: 2026-01-01T00:00:00.000Z
 updatedAt: 2026-01-01T00:00:00.000Z
 ---

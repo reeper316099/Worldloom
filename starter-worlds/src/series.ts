@@ -16,6 +16,12 @@ const SECRET = {
   sisterTwist: 'Mira is Kael’s sister by blood in the web novel',
   valdrinDebt: 'House Valdrin owes its fortune to the Unlit',
 };
+const EVENT = {
+  evOrrin: 'Orrin Vale falls at Keld Pass',
+  evSable: 'Sable first seen at the border',
+  evFurnace: 'Kael descends into the Cold Furnace',
+};
+export const SERIES_EVENT_SECRETS = Object.values(EVENT);
 export const SERIES_SECRETS = Object.values(SECRET);
 
 const P = (type: string, title: string, d: Omit<PageDef, 'type' | 'title'>): PageDef => ({ type, title, ...d });
@@ -28,7 +34,7 @@ const pages: PageDef[] = [
       species: 'Human', status: 'alive', firstAppearance: 'Web Novel ch 1',
       affiliations: ['Cinder Guild', 'Order of the Pale Lantern'], allies: ['Mira Ashgrove', 'Tamsin Quill'], enemies: ['Ilex Thorne'], mentor: 'Orrin Vale',
       abilities: ['Ember Step', 'Cinder Sight', 'Ashbind'], items: ['Marrow Blade', 'Ember Ledger'],
-      tier: gated('Cinder', wn(100), { adapt: 'Ember' }),
+      tier: { ...gated('Cinder', wn(100), { adapt: 'Ember' }), history: [{ arcId: 'a1', value: 'Spark' }, { arcId: 'a2', value: 'Ember' }, { arcId: 'a3', value: 'Cinder' }] },
     },
     body: `{{infobox}}
 
@@ -221,11 +227,25 @@ ${SECRET.sableIdentity}.
   P('concept', 'Cinder', { status: 'stub', body: `Third realm of [[Tempering]].\n` }),
 ];
 
+const timeline: NonNullable<StarterWorld['timeline']> = [
+  { id: 'ev-cold-fires', title: 'Night of Cold Fires', summary: 'Half of Ashmere burns with colorless flame.', pages: ['Night of Cold Fires', 'Kael Marrow'], order: 0, label: 'Year 0', arcId: 'a1' },
+  { id: 'ev-trials', title: 'Kael enters the guild trials', summary: 'Kael registers with the Cinder Guild.', pages: ['Kael Marrow', 'Cinder Guild'], order: 3, label: 'Year 3', arcId: 'a2' },
+  { id: 'ev-final', title: 'Kael faces Ilex in Lantern Hall', summary: 'The trial final.', pages: ['Kael Marrow', 'Ilex Thorne', 'Lantern Hall'], order: 4, label: 'Year 4', arcId: 'a2' },
+  { id: 'ev-siege', title: 'Siege of Keld Pass begins', summary: 'The garrison is cut off.', pages: ['Siege of Keld Pass', 'Brannoch Keld'], order: 6, label: 'Year 6', arcId: 'a3' },
+  { id: 'ev-orrin-wn', title: EVENT.evOrrin, summary: `${SECRET.orrinDeath}.`, pages: ['Orrin Vale'], order: 6.5, label: 'Year 6', trackId: 'wn', arcId: 'a3', reveal: wn(140) },
+  { id: 'ev-orrin-adapt', title: 'Orrin retires to Ashmere', summary: 'In the adaptation he survives the siege.', pages: ['Orrin Vale'], order: 6.5, label: 'Year 6', trackId: 'adapt', arcId: 'a3' },
+  { id: 'ev-sable', title: EVENT.evSable, summary: 'A masked figure leaves cold fires.', pages: ['Sable'], order: 7, label: 'Year 7', arcId: 'a4', reveal: arc('a4') },
+  { id: 'ev-furnace', title: EVENT.evFurnace, summary: 'Kael meets Sable.', pages: ['Kael Marrow', 'The Cold Furnace'], order: 8, label: 'Year 8', arcId: 'a4' },
+  { id: 'ev-quench', title: 'The Great Quench', summary: `${SECRET.quenchTruth}.`, pages: ['The Great Quench'], order: 9, label: 'Year 9', arcId: 'a5', reveal: arc('a5') },
+];
+
 export const SERIES: StarterWorld = {
+  timeline,
   slug: 'the-ashen-ascent',
   pack: 'series-lore',
   secrets: SERIES_SECRETS,
   spoilerSecrets: SERIES_SECRETS,
+  eventSecrets: SERIES_EVENT_SECRETS,
   world: {
     name: 'The Ashen Ascent', slug: 'the-ashen-ascent', accent: '#f08a4b',
     description: 'An invented system web-novel setting used to demo every Worldloom feature: two continuities, spoiler gates, citations and claims.',
@@ -255,7 +275,7 @@ export const SERIES: StarterWorld = {
         { id: 'flame', name: 'Flame', order: 4, description: '', color: '#ff6b81' },
         { id: 'blaze', name: 'Blaze', order: 5, description: '', color: '#f0a5ff' },
         { id: 'pyre', name: 'Pyre', order: 6, description: '', color: '#7c5cff' },
-        { id: 'zenith', name: 'Zenith', order: 7, description: 'Final realm.', color: '#38bdf8' },
+        { id: 'zenith', name: 'Zenith', order: 7, description: 'Final realm.', color: '#38bdf8', reveal: wn(250) },
       ],
     }],
     progress: { sources: { wn: 60, adapt: 8 }, showAll: false, revealed: [], impliedFloor: 'conservative' },
@@ -264,7 +284,7 @@ export const SERIES: StarterWorld = {
   relations: [
     { from: 'Kael Marrow', to: 'Mira Ashgrove', kind: 'family', label: 'sister', continuityIds: ['wn'] },
     { from: 'Kael Marrow', to: 'Mira Ashgrove', kind: 'ally', label: 'childhood friend', continuityIds: ['adapt'] },
-    { from: 'Orrin Vale', to: 'Kael Marrow', kind: 'master_student' },
+    { from: 'Kael Marrow', to: 'Orrin Vale', kind: 'master_student', label: 'student of' },
     { from: 'Kael Marrow', to: 'Ilex Thorne', kind: 'rival' },
     { from: 'Kael Marrow', to: 'Dovan Reth', kind: 'subordinate' },
     { from: 'Sable', to: 'Kael Marrow', kind: 'enemy', label: 'bound', reveal: wn(210) },
