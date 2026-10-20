@@ -10,6 +10,8 @@ import {
 import { WorldManager, SettingsSchema, defaultDataDir } from './manager';
 import { ApiError, badRequest } from './errors';
 import { BUILTIN_PACKS } from './packs';
+import { LorekeeperClient, assertLoopback, progressOf } from './lorekeeper';
+import { decodeBundle, encodeBundle, folderSync, joinFromFolder, listSyncFiles, makeBundle, markSynced, planMerge } from './sync';
 import { exportCsv, exportHtmlPage, exportHtmlWorld, exportJson, exportMarkdownZip, exportSiteZip, exportViewer, parseCsvImport, parseMarkdownFiles } from './transfer';
 import { buildGraph, buildLadder, buildTimeline, buildTree, compareMany, listTierSystems } from './visual';
 import { readAsset, storeAsset, MAX_ASSET_BYTES } from './assets';
@@ -101,11 +103,15 @@ export async function buildApp({ token, manager, log, staticDir }: AppOptions): 
   void MutQ;
 
   // ----- settings -----
-  app.get(`${r}/settings`, async () => manager.settings);
+  const publicSettings = () => {
+    const { integrations, ...rest } = manager.settings;
+    return { ...rest, integrations: { lorekeeper: { enabled: integrations.lorekeeper.enabled, baseUrl: integrations.lorekeeper.baseUrl, hasToken: !!integrations.lorekeeper.token } } };
+  };
+  app.get(`${r}/settings`, async () => publicSettings());
   app.put(`${r}/settings`, async (req) => {
-    const s = parse(SettingsSchema.partial(), req.body);
+    const s = parse(SettingsSchema.partial().omit({ integrations: true }), req.body);
     await manager.settingsFile.save(SettingsSchema.parse({ ...manager.settings, ...s }));
-    return manager.settings;
+    return publicSettings();
   });
   app.get(`${r}/info`, async () => ({ dataDir: manager.dataDir, defaultDataDir: defaultDataDir() }));
 
@@ -129,6 +135,105 @@ export async function buildApp({ token, manager, log, staticDir }: AppOptions): 
     parse(z.object({ confirm: z.literal('yes') }), req.query);
     await manager.remove((req.params as { w: string }).w);
     reply.status(204);
+  });
+
+  // ----- sync & sharing -----
+  const Res = z.enum(['newer', 'local', 'remote', 'both']).default('newer');
+  const bundleBody = z.object({ bundle: z.union([z.string(), z.record(z.unknown())]), passphrase: z.string().optional(), resolution: Res });
+  const needSealed = async (rp: WorldRepo, pass?: string) => {
+    if ((await manager.encryptionStatus(rp.slug)).encrypted && !pass) throw badRequest('This world is encrypted: sealing the file with a passphrase is required.');
+  };
+  app.post(`${W}/sync/export`, async (req, reply) => {
+    const rp = await repo(req);
+    const b = parse(z.object({ spoilers: z.boolean().default(false), passphrase: z.string().min(1).optional() }), req.body ?? {});
+    await needSealed(rp, b.passphrase);
+    const bundle = await makeBundle(rp, manager.settings.deviceId, b.spoilers);
+    if (b.spoilers) await markSynced(rp, `bundle:${bundle.origin.worldId}`); // what we shared = the base for the next merge
+    const text = await encodeBundle(bundle, b.passphrase);
+    return reply.header('Content-Type', 'application/json').header('Content-Disposition', `attachment; filename="${rp.slug}${b.spoilers ? '' : '-nospoilers'}.worldloom-bundle"`).send(text);
+  });
+  app.post(`${W}/sync/preview`, { bodyLimit: 128 * 1024 * 1024 }, async (req) => {
+    const rp = await repo(req);
+    const b = parse(bundleBody, req.body);
+    const bundle = await decodeBundle(b.bundle, b.passphrase);
+    return { origin: bundle.origin, includesSpoilers: bundle.includesSpoilers, ...(await planMerge(rp, bundle, `bundle:${bundle.origin.worldId}`, b.resolution)).plan };
+  });
+  app.post(`${W}/sync/apply`, { bodyLimit: 128 * 1024 * 1024 }, async (req) => {
+    const rp = await repo(req);
+    const b = parse(bundleBody, req.body);
+    const bundle = await decodeBundle(b.bundle, b.passphrase);
+    const m = await planMerge(rp, bundle, `bundle:${bundle.origin.worldId}`, b.resolution);
+    return { plan: m.plan, ...(await m.apply()) };
+  });
+  const FolderBody = z.object({ path: z.string().min(1).max(1000), passphrase: z.string().min(1).optional(), resolution: Res, apply: z.boolean().default(false) });
+  app.post(`${W}/sync/folder`, { bodyLimit: 128 * 1024 * 1024 }, async (req) => {
+    const rp = await repo(req);
+    const b = parse(FolderBody, req.body);
+    return folderSync(rp, manager.settings.deviceId, { folder: b.path, passphrase: b.passphrase, resolution: b.resolution, apply: b.apply, encrypted: (await manager.encryptionStatus(rp.slug)).encrypted });
+  });
+  app.get(`${r}/sync/folder-files`, async (req) => listSyncFiles(parse(z.object({ path: z.string().min(1) }), req.query).path));
+  app.post(`${r}/sync/join`, { bodyLimit: 128 * 1024 * 1024 }, async (req, reply) => {
+    const b = parse(z.object({ path: z.string().min(1), file: z.string().min(1), passphrase: z.string().optional(), name: z.string().optional() }), req.body);
+    const created = await joinFromFolder(manager, { folder: b.path, file: b.file, passphrase: b.passphrase, name: b.name });
+    reply.status(201);
+    return created.world;
+  });
+
+  // ----- Lorekeeper integration (opt-in, loopback only) -----
+  const lk = () => new LorekeeperClient(manager.settings.integrations.lorekeeper);
+  app.get(`${r}/integrations/lorekeeper`, async () => publicSettings().integrations.lorekeeper);
+  app.put(`${r}/integrations/lorekeeper`, async (req) => {
+    const b = parse(z.object({ enabled: z.boolean(), baseUrl: z.string().max(200), token: z.string().max(500).optional() }), req.body);
+    assertLoopback(b.baseUrl);
+    const cur = manager.settings.integrations.lorekeeper;
+    await manager.settingsFile.save({ ...manager.settings, integrations: { lorekeeper: { enabled: b.enabled, baseUrl: b.baseUrl, token: b.token ?? cur.token } } });
+    return publicSettings().integrations.lorekeeper;
+  });
+  app.post(`${r}/integrations/lorekeeper/test`, async () => lk().status());
+  app.get(`${r}/integrations/lorekeeper/search`, async (req) => lk().search(parse(z.object({ q: z.string().min(1).max(200) }), req.query).q));
+  app.post(`${W}/integrations/lorekeeper/sync`, async (req) => {
+    const rp = await repo(req);
+    const b = parse(z.object({ mode: z.enum(['max', 'follow']).default('max'), dryRun: z.boolean().default(false) }), req.body ?? {});
+    if (!manager.settings.integrations.lorekeeper.enabled) throw badRequest('The Lorekeeper integration is turned off.');
+    const client = lk();
+    const report: Array<{ sourceId: string; name: string; entry: string; from?: number; to?: number; action: 'raised' | 'lowered' | 'unchanged' | 'no-progress' | 'error'; message?: string }> = [];
+    const updates: Record<string, number> = {};
+    for (const s of rp.world.sources.filter((x) => x.link?.app === 'lorekeeper')) {
+      const from = rp.world.progress.sources[s.id];
+      try {
+        const e = await client.entry(s.link!.entryId);
+        const n = progressOf(e, s.link!.field);
+        if (n === null) { report.push({ sourceId: s.id, name: s.name, entry: e.title, from, action: 'no-progress', message: 'Lorekeeper has no progress number for this entry' }); continue; }
+        const to = b.mode === 'max' && from !== undefined ? Math.max(from, n) : n;
+        const action = from === undefined || to > from ? 'raised' : to < from ? 'lowered' : 'unchanged';
+        if (action !== 'unchanged') updates[s.id] = to;
+        report.push({ sourceId: s.id, name: s.name, entry: e.title, from, to, action });
+      } catch (err) {
+        if (err instanceof ApiError && err.code === 'lorekeeper_unreachable') throw err; // stop early: nothing else will work either
+        report.push({ sourceId: s.id, name: s.name, entry: s.link?.title ?? s.link!.entryId, from, action: 'error', message: (err as Error).message });
+      }
+    }
+    if (!b.dryRun && Object.keys(updates).length) await rp.updateWorld((w) => { w.progress.sources = { ...w.progress.sources, ...updates }; });
+    return { applied: !b.dryRun, report };
+  });
+
+  // ----- encryption -----
+  const slugOf = (req: FastifyRequest) => (req.params as { w: string }).w;
+  const Pass = z.object({ passphrase: z.string().min(1).max(1024) });
+  app.get(`${W}/encryption`, async (req) => manager.encryptionStatus(slugOf(req)));
+  app.post(`${W}/unlock`, async (req) => {
+    const rp = await manager.unlock(slugOf(req), parse(Pass, req.body).passphrase);
+    return { ok: true, name: rp.world.name };
+  });
+  app.post(`${W}/lock`, async (req) => { await manager.lock(slugOf(req)); return { ok: true }; });
+  app.post(`${W}/encryption/enable`, async (req) => {
+    const b = parse(Pass.extend({ label: z.string().max(80).optional(), purgeBackups: z.boolean().optional() }), req.body);
+    return manager.enableEncryption(slugOf(req), b.passphrase, b);
+  });
+  app.post(`${W}/encryption/disable`, async (req) => manager.disableEncryption(slugOf(req), parse(Pass, req.body).passphrase));
+  app.post(`${W}/encryption/change`, async (req) => {
+    const b = parse(z.object({ passphrase: z.string().min(1), newPassphrase: z.string().min(1).max(1024) }), req.body);
+    return manager.changePassphrase(slugOf(req), b.passphrase, b.newPassphrase);
   });
 
   // ----- starter worlds & type packs -----
@@ -433,13 +538,13 @@ export async function buildApp({ token, manager, log, staticDir }: AppOptions): 
   app.post(`${W}/assets`, { bodyLimit: MAX_ASSET_BYTES + 1024 }, async (req, reply) => {
     const rp = await repo(req);
     if (!Buffer.isBuffer(req.body)) throw badRequest('send the file as the raw request body with an image content-type');
-    const a = await storeAsset(path.join(rp.dir, 'assets'), req.body, req.headers['content-type']);
+    const a = await storeAsset(path.join(rp.dir, 'assets'), req.body, req.headers['content-type'], rp.codec);
     reply.status(201);
     return a;
   });
   app.get(`${W}/assets/:name`, async (req, reply) => {
     const rp = await repo(req);
-    const a = await readAsset(path.join(rp.dir, 'assets'), (req.params as { name: string }).name);
+    const a = await readAsset(path.join(rp.dir, 'assets'), (req.params as { name: string }).name, rp.codec);
     reply.header('Content-Type', a.type).header('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; sandbox").header('Cache-Control', 'private, max-age=31536000, immutable');
     return reply.send(a.data);
   });

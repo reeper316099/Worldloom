@@ -34,6 +34,10 @@ export const SourceSchema = z.object({
   }),
   url: z.string().optional(),
   notes: z.string().default(''),
+  /** Optional link to a Lorekeeper entry whose reading/watching progress feeds spoiler progress. */
+  link: z
+    .object({ app: z.literal('lorekeeper'), entryId: z.string().min(1), title: z.string().optional(), field: z.enum(['current', 'consumedUpTo']).default('current') })
+    .optional(),
 });
 export type Source = z.infer<typeof SourceSchema>;
 
@@ -77,6 +81,8 @@ export type Progress = z.infer<typeof ProgressSchema>;
 
 export const WorldSchema = z.object({
   schemaVersion: z.number().default(1),
+  /** Stable identity of this world across machines (used by bundle/folder sync). */
+  syncId: z.string().optional(),
   name: z.string().min(1),
   slug,
   description: z.string().default(''),

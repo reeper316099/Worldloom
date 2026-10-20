@@ -23,7 +23,34 @@ const TEMPLATES = {
   blank: { label: 'Blank', continuities: undefined, sources: undefined },
 } as const;
 
+function JoinDialog({ close }: { close: () => void }) {
+  const [folder, setFolder] = useState('');
+  const [files, setFiles] = useState<Array<{ file: string; name?: string; sealed: boolean }>>([]);
+  const [pass, setPass] = useState('');
+  const qc = useQueryClient();
+  const list = async () => { try { setFiles(await api.get(`/sync/folder-files?path=${encodeURIComponent(folder)}`)); } catch (e) { useApp.getState().toast((e as Error).message); } };
+  const join = async (file: string) => {
+    try { const w = await api.post<{ slug: string }>('/sync/join', { path: folder, file, passphrase: pass || undefined }); await qc.invalidateQueries(); close(); go(`/w/${w.slug}`); }
+    catch (e) { useApp.getState().toast((e as Error).message); }
+  };
+  return (
+    <div className="overlay" onMouseDown={close}>
+      <div className="dialog" role="dialog" aria-modal="true" aria-label="Join synced world" onMouseDown={(e) => e.stopPropagation()}>
+        <h3 style={{ margin: 0 }}>Join a synced world</h3>
+        <div className="row"><input aria-label="Sync folder" autoFocus placeholder="/path/to/shared/folder" value={folder} onChange={(e) => setFolder(e.target.value)} />
+          {window.worldloomDesktop?.chooseFolder && <button className="btn" onClick={async () => { const p = await window.worldloomDesktop?.chooseFolder?.(); if (p) setFolder(p); }}>Choose…</button>}
+          <button className="btn" onClick={() => void list()} disabled={!folder}>Look</button></div>
+        <label className="f">Passphrase (if the file is sealed)<input type="password" autoComplete="off" value={pass} onChange={(e) => setPass(e.target.value)} /></label>
+        {files.map((f) => <button key={f.file} className="btn" style={{ justifyContent: 'flex-start' }} onClick={() => void join(f.file)}>{f.name ?? (f.sealed ? '🔒 sealed world' : f.file)}</button>)}
+        {files.length === 0 && <div className="muted">No sync files found yet.</div>}
+        <div className="row"><span className="grow" /><button className="btn ghost" onClick={close}>Close</button></div>
+      </div>
+    </div>
+  );
+}
+
 export function Home() {
+  const [joining, setJoining] = useState(false);
   const { data, isLoading, error } = useWorlds();
   const [creating, setCreating] = useState(false);
   const qc = useQueryClient();
@@ -49,6 +76,7 @@ export function Home() {
           <h1 className="title">Your worlds</h1>
           <div className="muted">One wiki per series or campaign. Everything is stored locally as Markdown and JSON.</div>
         </div>
+        <button className="btn" onClick={() => setJoining(true)}>Join synced world…</button>
         <button className="btn" onClick={() => void importBackup()}>Import backup…</button>
         <button className="btn primary" onClick={() => setCreating(true)}>＋ New world</button>
       </div>
@@ -77,11 +105,11 @@ export function Home() {
       )}
       <div className="grid">
         {data?.map((w) => (
-          <a key={w.slug} className="card world-card" href={`#/w/${w.slug}`}>
+          <a key={w.slug} className="card world-card" href={`#/w/${w.slug}`} onClick={w.locked ? (e) => { e.preventDefault(); useApp.getState().setUnlock(w.slug); } : undefined}>
             <div className="cover" style={{ background: `linear-gradient(135deg, ${w.accent}, var(--accent))` }} />
             <div className="body">
-              <h3 style={{ margin: '0 0 4px' }}>{w.name}</h3>
-              <div className="muted" style={{ minHeight: 40 }}>{w.description || 'No description'}</div>
+              <h3 style={{ margin: '0 0 4px' }}>{w.locked ? '🔒 ' : w.encrypted ? '🔓 ' : ''}{w.name}</h3>
+              <div className="muted" style={{ minHeight: 40 }}>{w.locked ? 'Locked — click to enter your passphrase.' : w.description || 'No description'}</div>
               <div className="row muted" style={{ fontSize: '.8rem', margin: '10px 0 6px' }}>
                 <span>{w.pageCount} pages</span><span className="grow" /><span>{w.completeness}% complete</span>
               </div>
@@ -92,6 +120,7 @@ export function Home() {
         ))}
       </div>
       {creating && <NewWorld close={() => setCreating(false)} />}
+      {joining && <JoinDialog close={() => setJoining(false)} />}
     </>
   );
 }

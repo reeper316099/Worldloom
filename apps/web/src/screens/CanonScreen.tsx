@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { api, type ArcT, type Continuity, type SourceT } from '../api';
 import { useApp } from '../store';
 import { useWorld } from '../hooks';
+import { LorekeeperLink } from '../components/LorekeeperLink';
 
 const KINDS = ['web_novel', 'light_novel', 'manga', 'manhwa', 'manhua', 'anime', 'game', 'campaign', 'video', 'wiki', 'other'];
 const UNITS = ['Chapter', 'Episode', 'Volume', 'Session'];
@@ -76,6 +77,7 @@ export function CanonScreen({ w }: { w: string }) {
               <button className="btn ghost danger" aria-label="Remove source" onClick={() => sources.change((l) => { l.splice(i, 1); })}>✕</button>
             </div>
             <label className="f" style={{ marginTop: 6 }}>Notes<input value={s.notes ?? ''} onChange={(e) => sources.change((l) => { l[i]!.notes = e.target.value; })} /></label>
+            <LorekeeperLink link={s.link} onChange={(link) => sources.change((l) => { l[i]!.link = link; })} />
           </div>
         ))}
         <button className="btn" onClick={() => sources.change((l) => { l.push({ id: idFrom('Source', l.map((x) => x.id)), name: 'New source', kind: 'other', continuityId: world.continuities[0]!.id, units: { label: 'Chapter' }, notes: '' } as SourceT); })}>＋ Add source</button>

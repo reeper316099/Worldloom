@@ -1,9 +1,11 @@
 import { useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useQueryClient } from '@tanstack/react-query';
 import { api, q } from '../api';
 import { useTypes } from '../hooks';
 import { useApp } from '../store';
 import { download } from './GraphScreen';
+import { SyncCard } from '../components/SyncCard';
 
 const cfg = () => window.worldloom ?? { baseUrl: '', token: 'dev-token' };
 async function fetchBlob(path: string) {
@@ -51,7 +53,9 @@ export function DataScreen({ w }: { w: string }) {
   };
   return (
     <>
-      <h1 className="title" style={{ fontSize: '1.6rem' }}>Import & export</h1>
+      <h1 className="title" style={{ fontSize: '1.6rem' }}>Import, export & security</h1>
+      <EncryptionCard w={w} />
+      <SyncCard w={w} />
       <section className="card" style={{ marginBottom: 16, display: 'grid', gap: 10 }}>
         <h3 style={{ margin: 0 }}>Export</h3>
         <div className="row" style={{ flexWrap: 'wrap' }}>
@@ -89,5 +93,52 @@ export function DataScreen({ w }: { w: string }) {
         <div className="muted" style={{ fontSize: '.8rem' }}>A zip backup is taken automatically before every import, and the whole import can be undone from the toast.</div>
       </section>
     </>
+  );
+}
+
+function EncryptionCard({ w }: { w: string }) {
+  const qc = useQueryClient();
+  const toast = useApp.getState().toast;
+  const st = useQuery({ queryKey: ['enc', w], queryFn: () => api.get<{ encrypted: boolean; locked: boolean; state?: string }>(`/worlds/${w}/encryption`) });
+  const [pass, setPass] = useState('');
+  const [pass2, setPass2] = useState('');
+  const [next, setNext] = useState('');
+  const [label, setLabel] = useState('');
+  const [purge, setPurge] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const run = async (fn: () => Promise<unknown>, ok: string) => {
+    setBusy(true);
+    try { await fn(); toast(ok); setPass(''); setPass2(''); setNext(''); await qc.invalidateQueries(); }
+    catch (e) { toast((e as Error).message); } finally { setBusy(false); }
+  };
+  const enc = st.data?.encrypted;
+  return (
+    <section className="card" style={{ marginBottom: 16, display: 'grid', gap: 10 }}>
+      <h3 style={{ margin: 0 }}>Encryption {enc ? '🔒 on' : 'off'}</h3>
+      {!enc ? (
+        <>
+          <div className="muted" style={{ fontSize: '.85rem' }}>Encrypts every file of this world at rest (AES-256-GCM, scrypt key). There is no recovery: a forgotten passphrase means the data is gone. File names no longer reveal page titles. Exports you make are not encrypted unless you seal them.</div>
+          <div className="row" style={{ flexWrap: 'wrap' }}>
+            <input aria-label="Passphrase" type="password" autoComplete="new-password" placeholder="Passphrase (8+ characters)" style={{ maxWidth: 260 }} value={pass} onChange={(e) => setPass(e.target.value)} />
+            <input aria-label="Repeat passphrase" type="password" autoComplete="new-password" placeholder="Repeat passphrase" style={{ maxWidth: 260 }} value={pass2} onChange={(e) => setPass2(e.target.value)} />
+            <input aria-label="Name shown while locked" placeholder="Name shown while locked" style={{ maxWidth: 220 }} value={label} onChange={(e) => setLabel(e.target.value)} />
+          </div>
+          <label className="row"><input type="checkbox" style={{ width: 'auto' }} checked={purge} onChange={(e) => setPurge(e.target.checked)} />Delete older automatic backups (they may contain unencrypted copies)</label>
+          <div><button className="btn primary" disabled={busy || pass.length < 8 || pass !== pass2} onClick={() => void run(() => api.post(`/worlds/${w}/encryption/enable`, { passphrase: pass, label: label || undefined, purgeBackups: purge }), 'World encrypted')}>{busy ? 'Encrypting…' : 'Encrypt this world'}</button></div>
+        </>
+      ) : (
+        <>
+          <div className="row" style={{ flexWrap: 'wrap' }}>
+            <button className="btn" onClick={() => { location.hash = '#/'; void run(() => api.post(`/worlds/${w}/lock`), 'World locked'); }}>Lock now</button>
+          </div>
+          <div className="row" style={{ flexWrap: 'wrap' }}>
+            <input aria-label="Current passphrase" type="password" autoComplete="off" placeholder="Current passphrase" style={{ maxWidth: 240 }} value={pass} onChange={(e) => setPass(e.target.value)} />
+            <input aria-label="New passphrase" type="password" autoComplete="new-password" placeholder="New passphrase (to change)" style={{ maxWidth: 240 }} value={next} onChange={(e) => setNext(e.target.value)} />
+            <button className="btn" disabled={busy || !pass || next.length < 8} onClick={() => void run(() => api.post(`/worlds/${w}/encryption/change`, { passphrase: pass, newPassphrase: next }), 'Passphrase changed')}>Change passphrase</button>
+            <button className="btn danger" disabled={busy || !pass} onClick={() => void run(() => api.post(`/worlds/${w}/encryption/disable`, { passphrase: pass }), 'Encryption removed')}>Remove encryption</button>
+          </div>
+        </>
+      )}
+    </section>
   );
 }

@@ -9,7 +9,7 @@ import {
   coerceFields, FieldError, slugify, titleKey,
   type Board, type EntityType, type Page, type Relation, type TimelineEvent, type Revision, type World,
 } from '@worldloom/shared';
-import { JsonFile, atomicWrite, watchDir, withLock, zipBackup } from '@worldloom/jsonstore';
+import { JsonFile, atomicWrite, readText, watchDir, withLock, zipBackup, type Codec } from '@worldloom/jsonstore';
 import { escapeHtml, extractClaims, extractLinks, extractSection, redact, render, rewriteLinks, type LinkResolution, type RenderResult, type WikiLink } from '@worldloom/wikisyntax';
 import { ApiError, badRequest, conflict, notFound } from './errors';
 import { parsePageFile, serializePage, PageFileError } from './pagefile';
@@ -28,6 +28,8 @@ const tsName = (d = new Date()) => d.toISOString().replace(/:/g, '-');
 export interface RepoOptions {
   revisionDebounceMs?: number;
   watch?: boolean;
+  /** Encrypted worlds: transparently encrypt/decrypt every file this repo reads or writes. */
+  codec?: Codec;
 }
 export interface Tx {
   id: string;
@@ -77,6 +79,17 @@ export class WorldRepo {
     private opts: RepoOptions = {},
   ) {}
 
+  get codec() {
+    return this.opts.codec;
+  }
+  /** Read a world file (decrypting when this world is encrypted). */
+  private rd(file: string) {
+    return readText(file, this.opts.codec);
+  }
+  private wr(file: string, data: string | Uint8Array) {
+    return atomicWrite(file, data, this.opts.codec);
+  }
+
   get slug() {
     return this.world.slug;
   }
@@ -87,17 +100,17 @@ export class WorldRepo {
   // ---------- lifecycle ----------
   async open(): Promise<this> {
     const backupDir = this.p('..', '..', 'backups', 'files', path.basename(this.dir));
-    this.worldFile = new JsonFile(this.p('world.json'), { schema: WorldSchema, version: WORLD_SCHEMA_VERSION, backupDir });
+    this.worldFile = new JsonFile(this.p('world.json'), { schema: WorldSchema, version: WORLD_SCHEMA_VERSION, backupDir, codec: this.opts.codec });
     this.typesFile = new JsonFile(this.p('schema', 'entity-types.json'), {
-      schema: EntityTypesFileSchema, version: 1, backupDir, defaults: () => ({ schemaVersion: 1, types: defaultEntityTypes() }),
+      schema: EntityTypesFileSchema, version: 1, backupDir, codec: this.opts.codec, defaults: () => ({ schemaVersion: 1, types: defaultEntityTypes() }),
     });
     this.relationsFile = new JsonFile(this.p('relations.json'), {
-      schema: RelationsFileSchema, version: 1, backupDir, defaults: () => ({ schemaVersion: 1, relations: [] }),
+      schema: RelationsFileSchema, version: 1, backupDir, codec: this.opts.codec, defaults: () => ({ schemaVersion: 1, relations: [] }),
     });
     this.world = await this.worldFile.load();
     this.types = (await this.typesFile.load()).types;
     this.timelineFile = new JsonFile(this.p('timeline.json'), {
-      schema: TimelineFileSchema, version: 1, backupDir, defaults: () => ({ schemaVersion: 1, events: [] }),
+      schema: TimelineFileSchema, version: 1, backupDir, codec: this.opts.codec, defaults: () => ({ schemaVersion: 1, events: [] }),
     });
     await this.relationsFile.load();
     await this.timelineFile.load();
@@ -132,7 +145,7 @@ export class WorldRepo {
   }
   private async reloadWorld() {
     try {
-      const text = await fs.readFile(this.worldFile.file, 'utf8');
+      const text = await this.rd(this.worldFile.file);
       const w = this.worldFile.parse(text);
       this.world = w;
       this.progressVersion++;
@@ -143,7 +156,7 @@ export class WorldRepo {
   }
   private async reloadTypes() {
     try {
-      this.types = this.typesFile.parse(await fs.readFile(this.typesFile.file, 'utf8')).types;
+      this.types = this.typesFile.parse(await this.rd(this.typesFile.file)).types;
       this.events.emit('event', { type: 'types-changed' });
     } catch (e) {
       this.events.emit('event', { type: 'file-error', file: 'schema/entity-types.json', message: (e as Error).message });
@@ -155,12 +168,20 @@ export class WorldRepo {
   async ingestFile(file: string, initial = false): Promise<void> {
     let text: string;
     try {
-      text = await fs.readFile(file, 'utf8');
-    } catch {
-      return this.removeFile(file);
+      text = await this.rd(file);
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === 'ENOENT') return this.removeFile(file);
+      // unreadable (e.g. a tampered/corrupt encrypted file): keep what is in memory and report it
+      const err = { message: (e as Error).message };
+      this.fileErrors.set(file, err);
+      this.events.emit('event', { type: 'file-error', file: path.relative(this.dir, file), ...err });
+      return;
     }
     const h = sha(text);
-    if (this.hashOf.get(file) === h) return;
+    if (this.hashOf.get(file) === h) {
+      this.fileErrors.delete(file); // a repaired file clears its earlier error
+      return;
+    }
     let page: Page;
     try {
       page = parsePageFile(text);
@@ -464,7 +485,7 @@ export class WorldRepo {
     }
     const out = [];
     for (const f of files) {
-      const b = BoardSchema.safeParse(JSON.parse(await fs.readFile(this.p('boards', f), 'utf8')));
+      const b = BoardSchema.safeParse(JSON.parse(await this.rd(this.p('boards', f))));
       if (!b.success) continue;
       const vis = this.boardView(b.data, v);
       out.push({ id: b.data.id, name: b.data.name, items: Object.values(vis.placements).flat().length + vis.pool.length, updatedAt: b.data.updatedAt, context: b.data.context });
@@ -473,7 +494,7 @@ export class WorldRepo {
   }
   async readBoard(id: string): Promise<Board> {
     try {
-      return BoardSchema.parse(JSON.parse(await fs.readFile(this.boardFile(id), 'utf8')));
+      return BoardSchema.parse(JSON.parse(await this.rd(this.boardFile(id))));
     } catch (e) {
       if (e instanceof ApiError) throw e;
       throw notFound('board');
@@ -505,12 +526,21 @@ export class WorldRepo {
       }
       board.pool.push(...prev.pool.filter(hidden));
     }
-    await atomicWrite(this.boardFile(board.id), JSON.stringify(board, null, 2) + '\n');
+    await this.wr(this.boardFile(board.id), JSON.stringify(board, null, 2) + '\n');
     return board;
   }
   async deleteBoard(id: string) {
     await this.readBoard(id);
     await fs.rm(this.boardFile(id), { force: true });
+  }
+
+  /** Write a page received through sync (id preserved, slug made unique locally). Used by `sync.ts`. */
+  async syncWrite(p: Page, tx: Tx, isCopy = false): Promise<void> {
+    const meta = PageMetaSchema.parse({ ...p, fields: p.fields ?? {} }) as Page;
+    meta.body = typeof p.body === 'string' ? p.body : '';
+    const existing = this.pages.get(meta.id);
+    meta.slug = existing ? existing.slug : this.uniqueSlug(meta.type, meta.slug || slugify(meta.title), meta.id);
+    await this.persist(meta, tx, true, isCopy ? 'sync conflict copy' : 'synced');
   }
 
   // ---------- import ----------
@@ -691,8 +721,8 @@ export class WorldRepo {
   }
 
   // ---------- writing ----------
-  private pageFile(p: Pick<Page, 'type' | 'slug'>) {
-    return this.p('pages', p.type, `${p.slug}.md`);
+  private pageFile(p: Pick<Page, 'type' | 'slug'> & { id?: string }) {
+    return this.p('pages', p.type, `${this.opts.codec && p.id ? p.id : p.slug}.md`); // encrypted worlds use ids so file names don't reveal titles
   }
   private uniqueSlug(type: string, base: string, exceptId?: string) {
     let s = base;
@@ -724,7 +754,7 @@ export class WorldRepo {
         if (prevFile && prevFile !== file) await this.recordBefore(tx, prevFile);
       }
       const text = serializePage(page);
-      await atomicWrite(file, text);
+      await this.wr(file, text);
       if (prevFile && prevFile !== file) {
         await fs.rm(prevFile, { force: true });
         this.hashOf.delete(prevFile);
@@ -743,7 +773,7 @@ export class WorldRepo {
     if (tx.files.some((f) => f.file === file)) return;
     let before: string | null = null;
     try {
-      before = await fs.readFile(file, 'utf8');
+      before = await this.rd(file);
     } catch {
       /* new file */
     }
@@ -755,14 +785,14 @@ export class WorldRepo {
   async commitTx(tx: Tx) {
     this.txs.push(tx);
     if (this.txs.length > 20) this.txs.shift();
-    await atomicWrite(this.p('history', '_tx', `${tx.id}.json`), JSON.stringify(tx));
+    await this.wr(this.p('history', '_tx', `${tx.id}.json`), JSON.stringify(tx));
     return tx.id;
   }
   async undoTx(id: string) {
     let tx = this.txs.find((t) => t.id === id);
     if (!tx) {
       try {
-        tx = JSON.parse(await fs.readFile(this.p('history', '_tx', `${id}.json`), 'utf8')) as Tx;
+        tx = JSON.parse(await this.rd(this.p('history', '_tx', `${id}.json`))) as Tx;
       } catch {
         throw notFound('transaction');
       }
@@ -770,7 +800,7 @@ export class WorldRepo {
     await withLock(`world:${this.dir}`, async () => {
       for (const f of [...tx!.files].reverse()) {
         if (f.before === null) await fs.rm(f.file, { force: true });
-        else await atomicWrite(f.file, f.before);
+        else await this.wr(f.file, f.before);
       }
     });
     for (const f of tx.files) await this.ingestFile(f.file);
@@ -980,7 +1010,7 @@ export class WorldRepo {
     const last = existing[existing.length - 1];
     if (last && !name && debounce > 0) {
       try {
-        const prev = JSON.parse(await fs.readFile(path.join(dir, last), 'utf8')) as Revision;
+        const prev = JSON.parse(await this.rd(path.join(dir, last))) as Revision;
         if (!prev.name && Date.now() - Date.parse(prev.ts) < debounce) await fs.rm(path.join(dir, last), { force: true });
       } catch {
         /* ignore */
@@ -988,7 +1018,7 @@ export class WorldRepo {
     }
     const ts = new Date().toISOString();
     const rev: Revision = { pageId: page.id, ts, summary, name, snapshot: page };
-    await atomicWrite(path.join(dir, `${tsName(new Date(ts))}.json`), JSON.stringify(rev));
+    await this.wr(path.join(dir, `${tsName(new Date(ts))}.json`), JSON.stringify(rev));
     await this.compactRevisions(dir);
   }
   /** Keep the newest 30 always, then one per day up to 100 total; named snapshots are never dropped. */
@@ -1002,7 +1032,7 @@ export class WorldRepo {
         kept++;
         continue;
       }
-      const rev = JSON.parse(await fs.readFile(path.join(dir, f), 'utf8')) as Revision;
+      const rev = JSON.parse(await this.rd(path.join(dir, f))) as Revision;
       const day = rev.ts.slice(0, 10);
       if (rev.name || (!days.has(day) && kept < 100)) {
         days.add(day);
@@ -1020,7 +1050,7 @@ export class WorldRepo {
     }
     return Promise.all(
       files.map(async (f) => {
-        const r = RevisionSchema.parse(JSON.parse(await fs.readFile(path.join(dir, f), 'utf8')));
+        const r = RevisionSchema.parse(JSON.parse(await this.rd(path.join(dir, f))));
         return { ts: r.ts, summary: r.summary, name: r.name, title: r.snapshot.title, size: r.snapshot.body.length };
       }),
     );

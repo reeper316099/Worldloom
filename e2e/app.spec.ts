@@ -153,3 +153,37 @@ test('timeline and graph render; restart persists everything', async () => {
   // renderer is sandboxed: no Node globals
   expect(await page.evaluate(() => typeof (window as unknown as { require?: unknown }).require + typeof (window as unknown as { process?: unknown }).process)).toBe('undefinedundefined');
 });
+
+test('encrypted world: encrypt, lock, unlock (UI), files unreadable on disk', async () => {
+  const base = page.url().split('#')[0];
+  await page.goto(`${base}#/w/${W}/data`);
+  await expect(page.getByRole('heading', { name: /Encryption/ })).toBeVisible();
+  await a11y('data');
+  await page.getByLabel('Passphrase', { exact: true }).fill('e2e passphrase 123');
+  await page.getByLabel('Repeat passphrase').fill('e2e passphrase 123');
+  await page.getByLabel('Name shown while locked').fill('My private lore');
+  await page.getByRole('button', { name: 'Encrypt this world' }).click();
+  await expect(page.getByRole('heading', { name: /Encryption 🔒 on/ })).toBeVisible({ timeout: 20_000 });
+  const pagesDir = path.join(dataDir, 'worlds', W, 'pages', 'character');
+  const { readdirSync, readFileSync } = await import('node:fs');
+  expect(readdirSync(pagesDir).every((f) => /^p_|^st_/.test(f))).toBe(true);
+  expect(readFileSync(path.join(pagesDir, readdirSync(pagesDir)[0]!)).includes(Buffer.from('Kael'))).toBe(false);
+
+  await page.getByRole('button', { name: 'Lock now' }).click();
+  await expect(page.getByRole('heading', { name: 'Your worlds' })).toBeVisible();
+  const card = page.locator('.card', { hasText: 'My private lore' });
+  await expect(card).toContainText('Locked');
+  await card.click();
+  const dlg = page.getByRole('dialog', { name: 'Unlock world' });
+  await expect(dlg).toBeVisible();
+  await a11y('unlock');
+  await dlg.getByLabel('Passphrase').fill('wrong wrong wrong');
+  await dlg.getByRole('button', { name: 'Unlock' }).click();
+  await expect(dlg.getByRole('alert')).toContainText('Wrong passphrase');
+  await page.waitForTimeout(1200); // throttle window
+  await dlg.getByLabel('Passphrase').fill('e2e passphrase 123');
+  await dlg.getByRole('button', { name: 'Unlock' }).click();
+  await expect(page.getByRole('heading', { name: 'The Ashen Ascent' })).toBeVisible();
+  await page.goto(`${base}#/w/${W}/p/kael-marrow`);
+  await expect(page.getByRole('heading', { name: 'Kael Marrow' })).toBeVisible();
+});

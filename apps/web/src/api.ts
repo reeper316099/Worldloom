@@ -35,6 +35,11 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
   const text = await res.text();
   let data: { error?: { message?: string; details?: unknown } } | undefined;
   try { data = text ? JSON.parse(text) : undefined; } catch { /* non-JSON body from a proxy */ }
+  if (res.status === 423) {
+    const slug = /\/worlds\/([a-z0-9-]+)/.exec(path)?.[1];
+    // only prompt when the user is actually looking at that world (a refetch racing an intentional "Lock now" must not pop the dialog)
+    if (slug && location.hash.startsWith(`#/w/${slug}`)) window.dispatchEvent(new CustomEvent('wl-locked', { detail: slug }));
+  }
   if (!res.ok) throw new ApiErr(res.status, data?.error?.message ?? (res.status >= 500 ? `The local API returned ${res.status}` : res.statusText), data?.error?.details);
   return data as T;
 }
@@ -50,9 +55,10 @@ export const q = (o: Record<string, string | number | undefined | null>) => {
   return s ? '?' + s : '';
 };
 
-export interface WorldSummary { slug: string; name: string; description: string; accent: string; pageCount: number; completeness: number; lastEdited: string }
+export interface WorldSummary { encrypted?: boolean; locked?: boolean; slug: string; name: string; description: string; accent: string; pageCount: number; completeness: number; lastEdited: string }
 export interface Continuity { id: string; name: string; color: string; isPrimary: boolean }
-export interface SourceT { id: string; name: string; kind: string; continuityId: string; units: { label: string; count?: number } }
+export interface LkLink { app: 'lorekeeper'; entryId: string; title?: string; field: 'current' | 'consumedUpTo' }
+export interface SourceT { id: string; name: string; kind: string; continuityId: string; units: { label: string; count?: number }; link?: LkLink }
 export interface ArcT { id: string; name: string; order: number }
 export interface Progress { sources: Record<string, number>; arcCheckpoint?: string; showAll: boolean; revealed: string[] }
 export interface World { slug: string; name: string; description: string; accent: string; theme: { readingFont: 'serif' | 'sans' }; continuities: Continuity[]; sources: SourceT[]; arcs: ArcT[]; progress: Progress }

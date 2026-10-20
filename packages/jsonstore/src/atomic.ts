@@ -1,5 +1,6 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import type { Codec } from './codec';
 
 const queues = new Map<string, Promise<unknown>>();
 
@@ -31,7 +32,8 @@ export async function retryBusy<T>(fn: () => Promise<T>, tries = 8): Promise<T> 
 let counter = 0;
 
 /** Atomic write: tmp file in same dir -> fsync -> rename. */
-export async function atomicWrite(file: string, data: string | Uint8Array): Promise<void> {
+export async function atomicWrite(file: string, data: string | Uint8Array, codec?: Codec): Promise<void> {
+  if (codec) data = codec.encode(typeof data === 'string' ? Buffer.from(data, 'utf8') : data);
   const dir = path.dirname(file);
   await fs.mkdir(dir, { recursive: true });
   const tmp = path.join(dir, `.${path.basename(file)}.${process.pid}.${counter++}.tmp`);

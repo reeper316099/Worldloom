@@ -24,6 +24,7 @@ import { SettingsScreen } from './screens/SettingsScreen';
 import { Palette } from './components/Palette';
 import { Toasts, Help } from './components/Overlays';
 import { ProgressPanel } from './components/ProgressPanel';
+import { UnlockDialog } from './components/UnlockDialog';
 
 function useTheme() {
   const theme = useApp((s) => s.theme);
@@ -177,6 +178,7 @@ export function App() {
       <Palette slug={slug} />
       <Help />
       <ProgressDialog slug={slug} />
+      <UnlockDialog />
       <Toasts />
     </div>
   );

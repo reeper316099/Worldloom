@@ -2,14 +2,15 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
 import { atomicWrite, retryBusy } from './atomic';
+import type { Codec } from './codec';
 
 /** Small per-file rolling snapshots (plain copies) used for corruption recovery. */
 let snapSeq = 0;
 
 export async function snapshotFile(file: string, dir: string, keep = 5): Promise<void> {
-  let text: string;
+  let text: Buffer;
   try {
-    text = await retryBusy(() => fs.readFile(file, 'utf8'));
+    text = await retryBusy(() => fs.readFile(file)); // raw bytes: an encrypted file is backed up as ciphertext
   } catch {
     return;
   }
@@ -20,7 +21,7 @@ export async function snapshotFile(file: string, dir: string, keep = 5): Promise
   for (const old of all.slice(0, Math.max(0, all.length - keep))) await fs.rm(path.join(dir, old), { force: true });
 }
 
-export async function restoreLatest(dir: string, base: string): Promise<string | undefined> {
+export async function restoreLatest(dir: string, base: string, codec?: Codec): Promise<string | undefined> {
   let files: string[];
   try {
     files = (await fs.readdir(dir)).filter((f) => f.startsWith(base + '.') && f.endsWith('.bak')).sort();
@@ -29,7 +30,8 @@ export async function restoreLatest(dir: string, base: string): Promise<string |
   }
   for (const f of files.reverse()) {
     try {
-      const t = await fs.readFile(path.join(dir, f), 'utf8');
+      const raw = await fs.readFile(path.join(dir, f));
+      const t = (codec ? Buffer.from(codec.decode(raw)) : raw).toString('utf8');
       JSON.parse(t);
       return t;
     } catch {

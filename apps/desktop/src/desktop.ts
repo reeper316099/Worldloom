@@ -99,6 +99,11 @@ if (!app.requestSingleInstanceLock()) {
     stop = srv.close;
     ipcMain.on('wl:config', (e) => { e.returnValue = trusted(e) ? { baseUrl: origin, token } : null; }); // always answers: the preload blocks on this
     ipcMain.handle('wl:reveal-data-dir', (e) => { if (trusted(e)) return shell.openPath(dataDir).then(() => undefined); });
+    ipcMain.handle('wl:choose-folder', async (e) => {
+      if (!trusted(e) || !win) return null;
+      const r = await dialog.showOpenDialog(win, { title: 'Choose a folder', properties: ['openDirectory', 'createDirectory'] });
+      return r.canceled ? null : (r.filePaths[0] ?? null);
+    });
     ipcMain.handle('wl:choose-data-dir', async (e) => {
       if (!trusted(e) || !win) return null;
       const r = await dialog.showOpenDialog(win, { title: 'Choose data folder', properties: ['openDirectory', 'createDirectory'] });

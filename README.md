@@ -6,7 +6,8 @@ A local-first desktop wiki builder for deep fictional lore: manhwa / manhua / an
 - **Spoiler protection from your real progress** — gates on pages, blocks, fields, relations, events and tiers; enforced **server-side** everywhere (search, graph, hover cards, exports).
 - **Real wiki mechanics** — `[[links]]`, backlinks, aliases/redirects, red links, infoboxes, categories, page history, rename-with-link-rewrite (undoable).
 - **Visual lore tools** — relationship graph, hierarchies, parallel-track timeline, power-tier ladders, compare tool, tier-list boards.
-- **Private** — no accounts, no telemetry, **zero network calls**. Worlds are plain Markdown + JSON in your app-data folder.
+- **Private** — no accounts, no telemetry, **zero network calls** (the optional Lorekeeper link is loopback-only and off by default). Worlds are plain Markdown + JSON in your app-data folder, optionally **encrypted** per world.
+- **Share & sync without a cloud** — spoiler-safe bundles, three-way merges with conflict pages, shared-folder sync, and a Lorekeeper progress link ([details](docs/PRIVACY_AND_SYNC.md)).
 
 | Reader mode (spoilers hidden) | Timeline (one track per continuity) |
 | --- | --- |
@@ -34,7 +35,7 @@ Requires Node 22. Open a **demo world** from the home screen, or create your own
 
 ## Docs
 
-[ARCHITECTURE](docs/ARCHITECTURE.md) · [DATA_FORMAT](docs/DATA_FORMAT.md) · [WIKI_SYNTAX](docs/WIKI_SYNTAX.md) · [SPOILERS](docs/SPOILERS.md) · [SECURITY](docs/SECURITY.md)
+[ARCHITECTURE](docs/ARCHITECTURE.md) · [PRIVACY_AND_SYNC](docs/PRIVACY_AND_SYNC.md) · [DATA_FORMAT](docs/DATA_FORMAT.md) · [WIKI_SYNTAX](docs/WIKI_SYNTAX.md) · [SPOILERS](docs/SPOILERS.md) · [SECURITY](docs/SECURITY.md)
 
 ## Builds are unsigned
 

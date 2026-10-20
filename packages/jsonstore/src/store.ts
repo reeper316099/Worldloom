@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import type { ZodType } from 'zod';
 import { atomicWrite, locked, stableStringify, withLock } from './atomic';
+import type { Codec } from './codec';
 import { snapshotFile, restoreLatest } from './backup';
 
 export type Migration = (data: any) => any; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -18,6 +19,8 @@ export interface JsonFileOptions<T> {
   validate?: (data: T) => void;
   /** Directory for backups of this file (rolling, used for corruption recovery). */
   backupDir?: string;
+  /** Encrypt/decrypt this file on disk (encrypted worlds). */
+  codec?: Codec;
 }
 
 export class JsonStoreError extends Error {
@@ -64,9 +67,12 @@ export class JsonFile<T> {
   async load(): Promise<T> {
     return withLock(locked(this.file), async () => {
       let text: string;
+      let raw: Buffer;
       try {
-        text = await fs.readFile(this.file, 'utf8');
+        raw = await fs.readFile(this.file);
+        text = this.opts.codec ? Buffer.from(this.opts.codec.decode(raw)).toString('utf8') : raw.toString('utf8');
       } catch (e) {
+        if ((e as Error).message.startsWith('decryption failed')) return (this.cache = await this.recover(String((e as Error).message), e));
         if ((e as NodeJS.ErrnoException).code === 'ENOENT') {
           if (!this.opts.defaults) throw new JsonStoreError('file not found', this.file);
           const d = this.opts.defaults();
@@ -78,7 +84,7 @@ export class JsonFile<T> {
       try {
         return (this.cache = this.parse(text));
       } catch (e) {
-        return (this.cache = await this.recover(text, e));
+        return (this.cache = await this.recover(text, e, raw));
       }
     });
   }
@@ -101,11 +107,11 @@ export class JsonFile<T> {
     }
   }
 
-  private async recover(text: string, cause: unknown): Promise<T> {
+  private async recover(text: string, cause: unknown, raw?: Buffer): Promise<T> {
     const q = `${this.file}.corrupt-${Date.now()}`;
-    await fs.writeFile(q, text);
+    await fs.writeFile(q, raw ?? text);
     if (this.opts.backupDir) {
-      const restored = await restoreLatest(this.opts.backupDir, path.basename(this.file));
+      const restored = await restoreLatest(this.opts.backupDir, path.basename(this.file), this.opts.codec);
       if (restored !== undefined) {
         try {
           const data = this.parse(restored);
@@ -133,7 +139,7 @@ export class JsonFile<T> {
     this.opts.validate?.(validated);
     const out = this.opts.version ? { ...validated, schemaVersion: this.opts.version } : validated;
     if (this.opts.backupDir) await snapshotFile(this.file, this.opts.backupDir).catch(() => undefined);
-    await atomicWrite(this.file, stableStringify(out));
+    await atomicWrite(this.file, stableStringify(out), this.opts.codec);
     this.cache = validated;
   }
 
@@ -147,7 +153,8 @@ export class JsonFile<T> {
     return withLock(locked(this.file), async () => {
       let current: T;
       try {
-        current = this.parse(await fs.readFile(this.file, 'utf8'));
+        const raw = await fs.readFile(this.file);
+        current = this.parse((this.opts.codec ? Buffer.from(this.opts.codec.decode(raw)) : raw).toString('utf8'));
       } catch (e) {
         if ((e as NodeJS.ErrnoException).code === 'ENOENT' && this.opts.defaults) current = this.opts.defaults();
         else throw e;

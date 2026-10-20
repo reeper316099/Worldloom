@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { atomicWrite } from '@worldloom/jsonstore';
+import { atomicWrite, type Codec } from '@worldloom/jsonstore';
 import { badRequest, notFound } from './errors';
 
 export const MAX_ASSET_BYTES = 10 * 1024 * 1024;
@@ -22,7 +22,7 @@ export function assertSafeSvg(text: string) {
   if (bad.test(text)) throw badRequest('SVG contains disallowed content (scripts, external references, or embedded objects)');
 }
 
-export async function storeAsset(dir: string, data: Buffer, declared?: string): Promise<{ file: string; bytes: number }> {
+export async function storeAsset(dir: string, data: Buffer, declared?: string, codec?: Codec): Promise<{ file: string; bytes: number }> {
   if (!data.length) throw badRequest('empty upload');
   if (data.length > MAX_ASSET_BYTES) throw badRequest('file too large (max 10 MB)');
   let ext = sniff(data);
@@ -34,16 +34,17 @@ export async function storeAsset(dir: string, data: Buffer, declared?: string): 
   }
   const hash = crypto.createHash('sha256').update(data).digest('hex').slice(0, 32);
   const file = `${hash}.${ext}`;
-  await atomicWrite(path.join(dir, file), data);
+  await atomicWrite(path.join(dir, file), data, codec);
   return { file, bytes: data.length };
 }
 
-export async function readAsset(dir: string, name: string): Promise<{ data: Buffer; type: string }> {
+export async function readAsset(dir: string, name: string, codec?: Codec): Promise<{ data: Buffer; type: string }> {
   if (!FILE_RE.test(name)) throw notFound('asset');
   const full = path.resolve(dir, name);
   if (path.dirname(full) !== path.resolve(dir)) throw notFound('asset');
   try {
-    const data = await fs.readFile(full);
+    const raw = await fs.readFile(full);
+    const data = codec ? Buffer.from(codec.decode(raw)) : raw;
     const ext = name.split('.').pop()!;
     return { data, type: ext === 'svg' ? 'image/svg+xml' : ext === 'jpg' ? 'image/jpeg' : `image/${ext}` };
   } catch {

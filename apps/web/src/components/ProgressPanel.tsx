@@ -1,4 +1,6 @@
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useLorekeeper } from './LorekeeperLink';
 import { api, type World } from '../api';
 import { useApp } from '../store';
 
@@ -8,6 +10,20 @@ export function ProgressPanel({ w, world }: { w: string; world: World }) {
   const mode = useApp((s) => s.mode);
   const save = useMutation({ mutationFn: (b: object) => api.put(`/worlds/${w}/progress`, b), onSuccess: () => qc.invalidateQueries() });
   const clear = useMutation({ mutationFn: () => api.post(`/worlds/${w}/progress/reveal`, { clear: true }), onSuccess: () => qc.invalidateQueries() });
+  const lk = useLorekeeper();
+  const linked = world.sources.filter((s) => s.link);
+  const [syncMode, setSyncMode] = useState<'max' | 'follow'>('max');
+  const sync = async (quiet = false) => {
+    try {
+      const r = await api.post<{ report: Array<{ name: string; action: string; to?: number; message?: string }> }>(`/worlds/${w}/integrations/lorekeeper/sync`, { mode: syncMode });
+      await qc.invalidateQueries();
+      const changed = r.report.filter((x) => x.action === 'raised' || x.action === 'lowered');
+      const errs = r.report.filter((x) => x.action === 'error');
+      if (!quiet || changed.length || errs.length) useApp.getState().toast(changed.length ? `Synced from Lorekeeper: ${changed.map((c) => `${c.name} → ${c.to}`).join(', ')}` : errs.length ? `Lorekeeper: ${errs[0]!.message}` : 'Lorekeeper progress is already up to date');
+    } catch (e) { if (!quiet) useApp.getState().toast((e as Error).message); }
+  };
+  const auto = useRef(false);
+  useEffect(() => { if (!auto.current && lk.data?.enabled && linked.length) { auto.current = true; void sync(true); } }, [lk.data?.enabled, linked.length]); // eslint-disable-line react-hooks/exhaustive-deps
   const p = world.progress;
   const unset = world.sources.filter((s) => p.sources[s.id] === undefined);
   const primary = new Set(world.sources.filter((s) => world.continuities.find((c) => c.id === s.continuityId)?.isPrimary).map((s) => s.id));
@@ -39,6 +55,12 @@ export function ProgressPanel({ w, world }: { w: string; world: World }) {
           </label>
         )}
         {implied.length > 0 && <div className="muted" style={{ fontSize: '.78rem' }}>Implies at least: {implied.join(' · ')} (lowest for non-primary sources)</div>}
+        {lk.data?.enabled && linked.length > 0 && (
+          <div className="row" style={{ flexWrap: 'wrap' }}>
+            <button className="btn" onClick={() => void sync()}>🔗 Sync from Lorekeeper</button>
+            <select aria-label="Sync mode" style={{ width: 'auto' }} value={syncMode} onChange={(e) => setSyncMode(e.target.value as typeof syncMode)}><option value="max">only move forward</option><option value="follow">mirror exactly</option></select>
+          </div>
+        )}
         <label className="row"><input type="checkbox" style={{ width: 'auto' }} checked={p.showAll} onChange={(e) => save.mutate({ showAll: e.target.checked })} /> Show all spoilers</label>
         {p.revealed.length > 0 && (
           <div className="row muted" style={{ fontSize: '.8rem' }}>

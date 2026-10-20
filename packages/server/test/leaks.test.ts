@@ -28,7 +28,8 @@ const CLASSIFY: Record<string, Kind> = {
   [`${API}/worlds/:w/graph`]: 'filtered', [`${API}/worlds/:w/tree`]: 'filtered', [`${API}/worlds/:w/timeline`]: 'filtered',
   [`${API}/worlds/:w/timeline/events`]: 'author-only', [`${API}/worlds/:w/tiers`]: 'filtered', [`${API}/worlds/:w/tiers/:sid/ladder`]: 'filtered',
   [`${API}/worlds/:w/compare`]: 'filtered', [`${API}/worlds/:w/boards`]: 'filtered', [`${API}/worlds/:w/boards/:bid`]: 'filtered',
-  [`${API}/worlds/:w/export/:format`]: 'filtered',
+  [`${API}/worlds/:w/export/:format`]: 'filtered', [`${API}/worlds/:w/encryption`]: 'safe',
+  [`${API}/integrations/lorekeeper`]: 'safe', [`${API}/integrations/lorekeeper/search`]: 'safe', [`${API}/sync/folder-files`]: 'safe',
   [`${API}/worlds/:w/categories`]: 'filtered', [`${API}/worlds/:w/health-report`]: 'author-only',
   [`${API}/worlds/:w/history/:ref`]: 'author-only', [`${API}/worlds/:w/history/:ref/diff`]: 'author-only',
   [`${API}/worlds/:w/assets/:name`]: 'skip', // content-addressed binary images; no text
@@ -59,8 +60,9 @@ describe('route classification', () => {
   it('mutating routes cannot be used to read gated data without author intent', () => {
     const writes = app.routeTable.filter((r) => r.method !== 'GET').map((r) => `${r.method} ${r.url}`);
     // POST/PUT/PATCH responses echo author-owned data; read-like POSTs must be author-gated
-    const readLike = writes.filter((w) => /render|compare|diff/.test(w));
-    expect(readLike).toEqual([`POST ${API}/worlds/:w/render`]);
+    const readLike = writes.filter((w) => /render|compare|diff|sync\/(export|preview)/.test(w));
+    // sync/export & sync/preview return world content; they are explicit author actions with their own spoilers flag (tested in sync.test.ts)
+    expect(readLike.sort()).toEqual([`POST ${API}/worlds/:w/render`, `POST ${API}/worlds/:w/sync/export`, `POST ${API}/worlds/:w/sync/preview`].sort());
     // boards PUT filters its response per viewer (see boardView) and never echoes hidden pages
   });
 });
