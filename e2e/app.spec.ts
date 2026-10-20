@@ -99,8 +99,9 @@ test('editing: [[ autocomplete, autosave, rename with link rewrite, continuity s
   await page.keyboard.type('\n\nShe lives in [[Ashm');
   // wait until the completion list is settled and the right entry is selected (slow CI otherwise turns Enter into a newline)
   await expect(page.locator('.cm-tooltip-autocomplete li[aria-selected="true"]')).toContainText('Ashmere');
-  await page.waitForTimeout(400); // CodeMirror ignores Enter for 75 ms after the list appears (interactionDelay)
-  await page.keyboard.press('Enter');
+  // Accept by clicking: keyboard accept is ignored for a moment after each (re)render of the list (interactionDelay),
+  // which makes Enter racy on slow runners; the mouse path has no such delay.
+  await page.locator('.cm-tooltip-autocomplete li[aria-selected="true"]').click();
   await expect(editor).toContainText('[[Ashmere]]');
   await expect(page.locator('.prose a.wikilink', { hasText: 'Ashmere' })).toBeVisible(); // live preview
   await expect(page.getByText('Saved', { exact: true })).toBeVisible({ timeout: 15_000 });
