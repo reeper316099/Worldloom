@@ -4,7 +4,7 @@ import { api, q, type EntityType, type ListItem, type World, type WorldSummary, 
 import { useApp } from './store';
 
 export const useWorlds = () => useQuery({ queryKey: ['worlds'], queryFn: () => api.get<WorldSummary[]>('/worlds') });
-export const useWorld = (w: string) => useQuery({ queryKey: ['world', w], queryFn: () => api.get<World>(`/worlds/${w}`) });
+export const useWorld = (w: string) => useQuery({ queryKey: ['world', w], queryFn: () => api.get<World>(`/worlds/${w}?mode=author`) });
 export const useTypes = (w: string) => useQuery({ queryKey: ['types', w], queryFn: () => api.get<EntityType[]>(`/worlds/${w}/entity-types`) });
 
 /** Everything that depends on spoiler mode is keyed by it, so toggling refetches. */

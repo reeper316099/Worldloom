@@ -21,8 +21,8 @@ updatedAt: 2026-01-01T00:00:00.000Z
 
 The three-week siege that ends the third arc.
 
-:::continuity{ids="wn"}
+::::continuity{ids="wn"}
 :::spoiler{src="wn" at=140}
 Orrin Vale falls at the Siege of Keld Pass.
 :::
-:::
+::::

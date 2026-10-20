@@ -7,14 +7,14 @@ const save = (k: string, v: unknown) => { try { localStorage.setItem(k, JSON.str
 export interface Toast { id: number; text: string; action?: { label: string; run: () => void } }
 interface S {
   theme: ThemePref; density: 'comfortable' | 'compact'; mode: 'author' | 'reader'; continuity?: string; focus: boolean;
-  palette: null | 'command' | 'open'; help: boolean; toasts: Toast[];
+  palette: null | 'command' | 'open'; help: boolean; progress: boolean; setProgress(b: boolean): void; toasts: Toast[];
   setTheme(t: ThemePref): void; setDensity(d: 'comfortable' | 'compact'): void; toggleMode(): void; setContinuity(c?: string): void;
   openPalette(p: S['palette']): void; setHelp(b: boolean): void; toggleFocus(): void; toast(text: string, action?: Toast['action']): void;
 }
 let n = 0;
 export const useApp = create<S>((set, get) => ({
   theme: load('wl.theme', 'dark'), density: load('wl.density', 'comfortable'), mode: load('wl.mode', 'author'), continuity: undefined, focus: false,
-  palette: null, help: false, toasts: [],
+  palette: null, help: false, progress: false, setProgress: (progress) => set({ progress }), toasts: [],
   setTheme: (theme) => { save('wl.theme', theme); set({ theme }); },
   setDensity: (density) => { save('wl.density', density); set({ density }); },
   toggleMode: () => { const mode = get().mode === 'author' ? 'reader' : 'author'; save('wl.mode', mode); set({ mode }); },

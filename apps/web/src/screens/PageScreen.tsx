@@ -5,12 +5,15 @@ import { go, wPath } from '../router';
 import { useMode, useWorld } from '../hooks';
 import { useApp } from '../store';
 import { RenameDialog } from '../components/RenameDialog';
+import { useHoverCards } from '../components/HoverCard';
+import { useEffect } from 'react';
 
 export function PageScreen({ w, ref_ }: { w: string; ref_: string }) {
   const { mode, continuity } = useMode();
   const qc = useQueryClient();
   const { data: world } = useWorld(w);
   const [renaming, setRenaming] = useState(false);
+  const hover = useHoverCards(w);
   const page = useQuery({
     queryKey: ['page', w, ref_, mode, continuity],
     queryFn: () => api.get<PageView | PageHidden>(`/worlds/${w}/pages/${encodeURIComponent(ref_)}${q({ mode, cont: continuity })}`),
@@ -25,6 +28,12 @@ export function PageScreen({ w, ref_ }: { w: string; ref_: string }) {
       useApp.getState().toast('Revealed', { label: 'Undo', run: () => api.post(`/worlds/${w}/progress/reveal`, { key, undo: true }).then(() => qc.invalidateQueries()) });
     },
   });
+
+  // window title comes from the server-filtered view, so a gated page can never leak its title here
+  useEffect(() => {
+    document.title = page.data ? `${page.data.title} · ${world?.name ?? 'Worldloom'}` : 'Worldloom';
+    return () => { document.title = 'Worldloom'; };
+  }, [page.data, world?.name]);
 
   if (page.error) {
     return (
@@ -64,10 +73,10 @@ export function PageScreen({ w, ref_ }: { w: string; ref_: string }) {
         {!d.appliesToSelected && <div className="callout warn" style={{ marginTop: 10 }}>This page is not part of the selected continuity; showing it for reference.</div>}
       </div>
       <div className="cols">
-        <article className="prose" onClick={onProseClick} dangerouslySetInnerHTML={{ __html: d.html }} />
+        <article className="prose" onClick={onProseClick} {...hover.handlers} dangerouslySetInnerHTML={{ __html: d.html }} />
         <aside className="rail">
           <div className="sticky">
-            <Infobox rows={d.infobox.rows} title={d.title} />
+            <Infobox rows={d.infobox.rows} title={d.title} onReveal={mode === 'reader' ? (k) => reveal.mutate(k) : undefined} />
             <div className="card"><h4>What links here</h4>
               {back.data?.length ? <ul>{back.data.map((b) => <li key={b.id}><a href={`#/w/${w}/p/${b.slug}`}>{b.title}</a></li>)}</ul> : <div className="muted">Nothing yet</div>}
             </div>
@@ -87,6 +96,7 @@ export function PageScreen({ w, ref_ }: { w: string; ref_: string }) {
           </div>
         </aside>
       </div>
+      {hover.node}
       {renaming && <RenameDialog w={w} id={d.id} title={d.title} close={() => setRenaming(false)} onDone={(slug) => go(wPath(w, 'p', slug))} />}
     </>
   );
@@ -97,13 +107,13 @@ function continuityLabel(world: { continuities: Array<{ id: string; name: string
   return name ? <div className="pill" style={{ display: 'inline-block', marginTop: 8 }}>Viewing: {name}</div> : null;
 }
 
-function Infobox({ rows, title }: { rows: PageView['infobox']['rows']; title: string }) {
+function Infobox({ rows, title, onReveal }: { rows: PageView['infobox']['rows']; title: string; onReveal?: (key: string) => void }) {
   return (
     <div className="infobox" style={{ marginBottom: 16 }}>
       <div className="infobox-title">{title}</div>
       {rows.length === 0 && <div className="infobox-row muted">No fields yet</div>}
       {rows.map((r) => (
-        <div className={`infobox-row ${r.hidden ? 'gated' : ''}`} key={r.key}>
+        <div className={`infobox-row ${r.hidden ? 'gated' : ''}`} key={r.key} title={r.hidden && onReveal ? 'Click to reveal this value' : undefined} onClick={r.hidden && r.revealKey && onReveal ? () => onReveal(r.revealKey!) : undefined}>
           <span className="k">{r.label}</span><span className="v">{Array.isArray(r.value) ? r.value.join(', ') : String(r.value)}</span>
         </div>
       ))}

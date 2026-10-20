@@ -5,9 +5,9 @@ import { EventEmitter } from 'node:events';
 import { diffLines } from 'diff';
 import { z } from 'zod';
 import {
-  EntityTypesFileSchema, RelationsFileSchema, WorldSchema, PageMetaSchema, RevisionSchema, WORLD_SCHEMA_VERSION,
+  EntityTypesFileSchema, RelationsFileSchema, revealSatisfied, WorldSchema, PageMetaSchema, RevisionSchema, WORLD_SCHEMA_VERSION,
   coerceFields, FieldError, slugify, titleKey,
-  type EntityType, type Page, type Revision, type World,
+  type EntityType, type Page, type Relation, type Revision, type World,
 } from '@worldloom/shared';
 import { JsonFile, atomicWrite, watchDir, withLock, zipBackup } from '@worldloom/jsonstore';
 import { escapeHtml, extractLinks, extractSection, redact, render, rewriteLinks, type LinkResolution, type RenderResult, type WikiLink } from '@worldloom/wikisyntax';
@@ -37,6 +37,7 @@ export interface PageInput {
   categories?: string[]; fields?: Record<string, unknown>; appliesTo?: Page['appliesTo']; reveal?: Page['reveal'];
   dmOnly?: boolean; redirectsTo?: string; body?: string;
 }
+export type PagePatch = Omit<PageInput, 'reveal'> & { reveal?: Page['reveal'] | null };
 
 export class WorldRepo {
   readonly events = new EventEmitter();
@@ -356,6 +357,66 @@ export class WorldRepo {
       createdAt: p.createdAt, updatedAt: p.updatedAt,
     };
   }
+  /** Derived (relation fields) + explicit edges, spoiler-filtered. Endpoints must both be visible. */
+  relations(v: Viewer, continuity?: string) {
+    const ok = (p: Page | undefined): p is Page => !!p && pageVisible(v, p) && (continuity === undefined || p.appliesTo === 'all' || p.appliesTo.includes(continuity));
+    const edges = new Map<string, { id: string; from: string; to: string; kind: string; label?: string; origin: 'field' | 'explicit'; timeSpan?: unknown }>();
+    for (const p of this.pages.values()) {
+      if (!ok(p)) continue;
+      for (const d of this.typeOf(p)?.fields ?? []) {
+        if (d.type !== 'relation' || p.fields[d.key] === undefined) continue;
+        const r = resolveField(p.fields[d.key], continuity, v, `${p.id}.${d.key}`);
+        if (r.hidden || r.value === undefined) continue;
+        for (const name of Array.isArray(r.value) ? r.value : [r.value]) {
+          const t = this.resolve(String(name), d.relationTo);
+          if (!ok(t) || t.id === p.id) continue;
+          const id = `f:${p.id}:${d.key}:${t.id}`;
+          edges.set(id, { id, from: p.id, to: t.id, kind: d.relationKind ?? d.key, label: d.label, origin: 'field' });
+        }
+      }
+    }
+    for (const r of this.relationsFile.get()?.relations ?? []) {
+      if (!revealOk(v, r.reveal, `relation:${r.id}`)) continue;
+      if (continuity && r.continuityIds?.length && !r.continuityIds.includes(continuity)) continue;
+      if (!ok(this.pages.get(r.fromId)) || !ok(this.pages.get(r.toId))) continue;
+      edges.set(`e:${r.id}`, { id: `e:${r.id}`, from: r.fromId, to: r.toId, kind: r.kind, label: r.label, origin: 'explicit', timeSpan: r.timeSpan });
+    }
+    const ids = new Set([...edges.values()].flatMap((e) => [e.from, e.to]));
+    const nodes = [...ids].map((id) => this.pages.get(id)!).map((p) => ({ id: p.id, title: p.title, slug: p.slug, type: p.type }));
+    return { nodes, edges: [...edges.values()] };
+  }
+  async setRelations(rels: Relation[]) {
+    for (const r of rels) if (!this.pages.has(r.fromId) || !this.pages.has(r.toId)) throw badRequest(`relation ${r.id} references an unknown page`);
+    const ids = rels.map((r) => r.id);
+    if (new Set(ids).size !== ids.length) throw badRequest('duplicate relation ids');
+    await this.relationsFile.save({ schemaVersion: 1, relations: rels });
+    this.version++;
+    return rels;
+  }
+
+  /** Hover card: spoiler-filtered summary of a page. */
+  card(ref: string, v: Viewer, continuity?: string) {
+    const p = this.findPage(ref);
+    if (!p) throw notFound('page');
+    if (!pageVisible(v, p)) return { hidden: true as const, id: p.id, title: this.stubTitle(v, p) };
+    const box = buildInfobox(p, this.typeOf(p), v, continuity);
+    const para = this.readerText(p, v).split(/\n{2,}/).map((x) => x.trim()).find((x) => x && !/^(#|\{\{|:::)/.test(x));
+    const excerpt = (para ?? '').replace(/\{\{[^}]*\}\}/g, '').replace(/[*_`>#]/g, '').replace(/\s+/g, ' ').trim().slice(0, 220);
+    return { hidden: false as const, id: p.id, title: p.title, slug: p.slug, type: p.type, typeName: this.typeOf(p)?.name ?? p.type, status: p.status, image: box.image, rows: box.rows.slice(0, 4), excerpt };
+  }
+
+  /** World config with spoiler-bearing structure (arc names/summaries, gated tier systems) masked for readers. */
+  worldView(v: Viewer): World {
+    const w = this.world;
+    if (v.mode === 'author') return w;
+    const eff = { progress: w.progress, arcs: w.arcs, sources: w.sources, primarySourceIds: v.primarySourceIds };
+    return {
+      ...w,
+      arcs: w.arcs.map((a) => (revealSatisfied({ arcId: a.id }, eff) || w.progress.showAll ? a : { ...a, name: '???', summary: '', ranges: {} })),
+      tierSystems: w.tierSystems.filter((t) => !t.reveal || revealOk(v, t.reveal)).map((t) => ({ ...t, tiers: t.tiers })),
+    };
+  }
+
   /** Live preview of unsaved Markdown (author view) for the editor. */
   preview(body: string, pageId?: string, continuity?: string) {
     const base = pageId ? this.pages.get(pageId) : undefined;
@@ -582,13 +643,14 @@ export class WorldRepo {
     return page;
   }
 
-  async patch(id: string, input: PageInput, summary = 'edited'): Promise<Page> {
+  async patch(id: string, input: PagePatch, summary = 'edited'): Promise<Page> {
     const cur = this.pages.get(id);
     if (!cur) throw notFound('page');
     if (input.type && input.type !== cur.type) throw badRequest('use move to change type');
     if (input.title && input.title !== cur.title) throw badRequest('use rename to change title');
+    const { reveal: revealIn, ...rest } = input;
     const next = PageMetaSchema.parse({
-      ...cur, ...stripUndef({ ...input, body: undefined, slug: undefined }), id,
+      ...cur, ...stripUndef({ ...rest, body: undefined, slug: undefined }), id, reveal: revealIn === null ? undefined : (revealIn ?? cur.reveal),
       fields: input.fields ? this.coerce(cur.type, input.fields) : cur.fields, updatedAt: new Date().toISOString(),
     }) as Page;
     next.body = input.body ?? cur.body;

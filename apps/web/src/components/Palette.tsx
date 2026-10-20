@@ -40,6 +40,7 @@ function PaletteInner({ kind, slug, close }: { kind: 'command' | 'open'; slug?: 
     ];
     if (slug) {
       cmds.unshift({ key: 'dash', label: 'Go to world dashboard', run: nav(wPath(slug)) });
+      cmds.unshift({ key: 'progress', label: 'Set my progress…', run: () => { close(); s.setProgress(true); } });
       cmds.unshift({ key: 'canon', label: 'Manage continuities, sources & arcs', run: nav(wPath(slug, 'canon')) });
       cmds.unshift({ key: 'types', label: 'Manage types & templates', run: nav(wPath(slug, 'types')) });
       for (const t of types.data ?? []) cmds.push({ key: 'new-' + t.slug, label: `New ${t.name}…`, run: nav(wPath(slug, 'new') + `?type=${t.slug}`) });

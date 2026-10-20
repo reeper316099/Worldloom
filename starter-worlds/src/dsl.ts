@@ -29,6 +29,8 @@ export interface StarterWorld {
   relations: RelationDef[];
   /** Strings that appear ONLY in spoiler-gated content; used by the leak tests. */
   secrets: string[];
+  /** Subset of secrets gated by reading progress (not DM-only); checked in non-player reader mode too. */
+  spoilerSecrets: string[];
 }
 export const wn = (at: number): Reveal => ({ sourceId: 'wn', at });
 export const arc = (arcId: string): Reveal => ({ arcId });

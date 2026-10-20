@@ -1,15 +1,15 @@
 import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, q, type World } from '../api';
+import { useQuery } from '@tanstack/react-query';
+import { api, q } from '../api';
 import { go, wPath } from '../router';
-import { useList, useMode, useTypes, useWorld } from '../hooks';
+import { useList, useTypes, useWorld } from '../hooks';
+import { ProgressPanel } from '../components/ProgressPanel';
 
 export function Dashboard({ w }: { w: string }) {
   const { data: world, error } = useWorld(w);
   const types = useTypes(w);
   const recent = useList(w, { sort: 'updated', order: 'desc', limit: 8 });
   const all = useList(w, { limit: 1000 });
-  const { mode } = useMode();
   const health = useQuery({ queryKey: ['health', w], queryFn: () => api.get<{ stubs: unknown[]; redLinks: unknown[]; unsourcedClaims: unknown[]; orphans: unknown[]; completeness: number; total: number }>(`/worlds/${w}/health-report${q({ mode: 'author' })}`) });
   const [text, setText] = useState('');
   if (error) return <div className="card">World not found. <a href="#/">Back to worlds</a></div>;
@@ -63,7 +63,7 @@ export function Dashboard({ w }: { w: string }) {
           </section>
         </div>
         <aside className="rail" style={{ display: 'grid', gap: 16 }}>
-          <ProgressWidget w={w} world={world} mode={mode} />
+          <ProgressPanel w={w} world={world} />
           <section className="card">
             <h4>Wiki health</h4>
             {health.data ? (
@@ -80,37 +80,3 @@ export function Dashboard({ w }: { w: string }) {
   );
 }
 
-function ProgressWidget({ w, world, mode }: { w: string; world: World; mode: string }) {
-  const qc = useQueryClient();
-  const save = useMutation({
-    mutationFn: (b: object) => api.put(`/worlds/${w}/progress`, b),
-    onSuccess: () => qc.invalidateQueries(),
-  });
-  const p = world.progress;
-  return (
-    <section className="card">
-      <h4>My progress</h4>
-      <div className="muted" style={{ fontSize: '.8rem', marginBottom: 8 }}>
-        {mode === 'reader' ? 'Reader mode: content beyond this is hidden.' : 'Author mode shows everything; switch to reader mode to apply this.'}
-      </div>
-      {world.sources.length === 0 && <div className="muted">Add sources to track progress.</div>}
-      <div style={{ display: 'grid', gap: 8 }}>
-        {world.sources.map((s) => (
-          <label className="f" key={s.id}>{s.name} · {s.units.label}
-            <input type="number" min={0} placeholder="not set (everything gated is hidden)" defaultValue={p.sources[s.id] ?? ''}
-              onBlur={(e) => e.target.value !== '' && save.mutate({ sources: { [s.id]: Number(e.target.value) } })} />
-          </label>
-        ))}
-        {world.arcs.length > 0 && (
-          <label className="f">Finished arc
-            <select value={p.arcCheckpoint ?? ''} onChange={(e) => save.mutate({ arcCheckpoint: e.target.value || undefined })}>
-              <option value="">—</option>
-              {[...world.arcs].sort((a, b) => a.order - b.order).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-            </select>
-          </label>
-        )}
-        <label className="row"><input type="checkbox" style={{ width: 'auto' }} checked={p.showAll} onChange={(e) => save.mutate({ showAll: e.target.checked })} /> Show all spoilers</label>
-      </div>
-    </section>
-  );
-}

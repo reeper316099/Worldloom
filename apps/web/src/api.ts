@@ -38,12 +38,12 @@ export interface World { slug: string; name: string; description: string; accent
 export interface FieldDef { key: string; label: string; type: string; options?: string[]; multiple?: boolean; relationTo?: string; relationKind?: string; perContinuity?: boolean }
 export interface EntityType { id: string; name: string; slug: string; fields: FieldDef[]; bodyTemplate: string }
 export interface ListItem { id: string; title: string; slug: string; type?: string; status?: string; hidden: boolean; updatedAt?: string; aliases?: string[] }
-export interface InfoRow { key: string; label: string; type: string; value: unknown; hidden?: boolean }
+export interface InfoRow { key: string; label: string; type: string; value: unknown; hidden?: boolean; revealKey?: string }
 export interface PageView {
   hidden: false; id: string; title: string; slug: string; type: string; typeName: string; status: string; aliases: string[]; tags: string[];
   categories: string[]; appliesToSelected: boolean; html: string; headings: Array<{ depth: number; text: string; id: string }>; infobox: { rows: InfoRow[] };
   claims: Array<{ kind: string; text: string; cited: boolean }>; updatedAt: string; dmOnly: boolean;
 }
 export interface PageHidden { hidden: true; id: string; title: string; message: string }
-export interface RawPage { id: string; type: string; title: string; slug: string; aliases: string[]; status: string; tags: string[]; fields: Record<string, unknown>; appliesTo: 'all' | string[]; body: string }
+export interface RawPage { id: string; type: string; title: string; slug: string; aliases: string[]; status: string; tags: string[]; fields: Record<string, unknown>; appliesTo: 'all' | string[]; reveal?: { sourceId: string; at: number } | { arcId: string }; dmOnly?: boolean; body: string }
 export interface Hit { id: string; title: string; slug: string; type: string; snippet?: string; alias?: string }

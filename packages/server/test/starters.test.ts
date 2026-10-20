@@ -107,3 +107,15 @@ describe('starter worlds', () => {
     expect((await send('POST', `/worlds/${slug}/type-pack/import`, { pack: { name: 'bad', types: [] }, mode: 'add' })).status).toBe(400);
   });
 });
+
+describe('starter markup sanity', () => {
+  it('renders every page without stray directive fences (nesting needs longer outer fences)', async () => {
+    for (const [slug] of [['the-ashen-ascent'], ['gloamreach-campaign']]) {
+      const list = (await get(`/worlds/${slug}/pages?mode=author&limit=1000`)).json().items as Array<{ slug: string }>;
+      for (const p of list) {
+        const html = (await get(`/worlds/${slug}/pages/${encodeURIComponent(p.slug)}?mode=author`)).json().html as string;
+        expect(html, `${slug}/${p.slug}`).not.toMatch(/(^|>)\s*:{3,}/);
+      }
+    }
+  });
+});

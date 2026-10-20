@@ -14,6 +14,7 @@ import { CanonScreen } from './screens/CanonScreen';
 import { CompareScreen } from './screens/CompareScreen';
 import { Palette } from './components/Palette';
 import { Toasts, Help } from './components/Overlays';
+import { ProgressPanel } from './components/ProgressPanel';
 
 function useTheme() {
   const theme = useApp((s) => s.theme);
@@ -70,6 +71,20 @@ function useHotkeys(slug?: string) {
   }, [s, qc, slug]);
 }
 
+function ProgressDialog({ slug }: { slug?: string }) {
+  const open = useApp((s) => s.progress);
+  const { data: world } = useWorld(slug ?? '');
+  if (!open || !slug || !world) return null;
+  return (
+    <div className="overlay" onMouseDown={() => useApp.getState().setProgress(false)}>
+      <div className="dialog" role="dialog" aria-label="My progress" onMouseDown={(e) => e.stopPropagation()}>
+        <ProgressPanel w={slug} world={world} />
+        <div className="row"><span className="grow" /><button className="btn" onClick={() => useApp.getState().setProgress(false)}>Done</button></div>
+      </div>
+    </div>
+  );
+}
+
 export function App() {
   const route = useRoute();
   const { mode, toggleMode, setTheme, theme, focus, continuity } = useApp();
@@ -111,6 +126,7 @@ export function App() {
             {world.continuities.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         )}
+        {slug && <button className="btn ghost" onClick={() => useApp.getState().setProgress(true)}>Progress</button>}
         {slug && <a className="btn ghost" href={`#/w/${slug}/canon`}>Canon</a>}
         {slug && <a className="btn ghost" href={`#/w/${slug}/types`}>Types</a>}
         <button className="btn ghost" onClick={() => useApp.getState().openPalette('command')} aria-label="Open command palette">⌘K</button>
@@ -124,6 +140,7 @@ export function App() {
       <main className="main"><div className="wrap">{screen}</div></main>
       <Palette slug={slug} />
       <Help />
+      <ProgressDialog slug={slug} />
       <Toasts />
     </div>
   );

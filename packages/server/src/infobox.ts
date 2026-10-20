@@ -8,6 +8,8 @@ export interface InfoboxRow {
   type: FieldDef['type'];
   value: unknown;
   hidden?: boolean;
+  /** Present only on hidden rows: key for the per-item reveal override. */
+  revealKey?: string;
 }
 export interface Infobox {
   title: string;
@@ -55,7 +57,7 @@ export function buildInfobox(page: Page, type: EntityType | undefined, v: Viewer
     const raw = page.fields[d.key];
     if (raw === undefined || raw === null || raw === '') continue;
     const r = resolveField(raw, continuity, v, `${page.id}.${d.key}`);
-    if (r.hidden) rows.push({ key: d.key, label: d.label, type: d.type, value: '???', hidden: true });
+    if (r.hidden) rows.push({ key: d.key, label: d.label, type: d.type, value: '???', hidden: true, revealKey: `field:${page.id}.${d.key}` });
     else if (r.value !== undefined && r.value !== null && r.value !== '') rows.push({ key: d.key, label: d.label, type: d.type, value: r.value });
   }
   const img = typeof page.fields.image === 'string' ? page.fields.image : undefined;

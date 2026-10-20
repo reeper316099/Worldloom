@@ -14,12 +14,12 @@ const SNIPPETS: Completion[] = [
   { label: '/cite', detail: 'Citation chip', apply: '{{src: Source ch 1}}' },
   { label: '/claim', detail: 'Claim marker', apply: '{{claim: confirmed}}text{{/claim}}' },
   { label: '/continuity', detail: 'Continuity block', apply: ':::continuity{ids="wn"}\ntext\n:::\n' },
-  { label: '/diff', detail: 'Continuity diff block', apply: ':::diff\n:::continuity{ids="wn"}\nIn the web novel…\n:::\n:::continuity{ids="adaptation"}\nIn the adaptation…\n:::\n:::\n' },
+  { label: '/diff', detail: 'Continuity diff block', apply: '::::diff\n:::continuity{ids="wn"}\nIn the web novel…\n:::\n:::continuity{ids="adaptation"}\nIn the adaptation…\n:::\n::::\n' },
   { label: '/spoiler', detail: 'Spoiler block', apply: ':::spoiler{src="wn" at=1}\nhidden text\n:::\n' },
   { label: '/callout', detail: 'Callout', apply: ':::callout{type="note"}\ntext\n:::\n' },
 ];
 
-export function CodeEditor(props: { value: string; world: string; onChange: (v: string) => void; vimMode: boolean; spell: boolean }) {
+export function CodeEditor(props: { apiRef?: React.MutableRefObject<{ wrap: (open: string, close: string) => void } | undefined>; value: string; world: string; onChange: (v: string) => void; vimMode: boolean; spell: boolean }) {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView>();
   const cb = useRef(props.onChange);
@@ -63,6 +63,11 @@ export function CodeEditor(props: { value: string; world: string; onChange: (v: 
       }),
     });
     view.current = v;
+    if (props.apiRef) props.apiRef.current = { wrap: (open, close) => {
+      const sel = v.state.selection.main;
+      v.dispatch({ changes: [{ from: sel.from, insert: open }, { from: sel.to, insert: close }], selection: { anchor: sel.from + open.length, head: sel.to + open.length } });
+      v.focus();
+    } };
     return () => v.destroy();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.world]);

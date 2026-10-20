@@ -40,11 +40,11 @@ A scarred veteran who becomes Kael's teacher. Gruff, patient, and fond of terrib
 
 Orrin trains Kael through the [[Lantern Trials]] and later takes command of the line at [[Keld Pass]].
 
-:::continuity{ids="wn"}
+::::continuity{ids="wn"}
 :::spoiler{src="wn" at=140}
 In the web novel, Orrin Vale falls at the Siege of Keld Pass.
 :::
-:::
+::::
 
 :::continuity{ids="adapt"}
 In the adaptation Orrin survives the siege and retires to [[Ashmere]] {{src: Adaptation ep 16}}.

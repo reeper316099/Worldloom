@@ -48,14 +48,14 @@ Chapter 120 reveals that ${SECRET.kaelCore}, which is why every [[Ember Ledger]]
 
 ## Continuity differences
 
-:::diff
+::::diff
 :::continuity{ids="wn"}
 In the web novel Kael reaches [[Cinder]] realm by chapter 100 {{src: Web Novel ch 100}}.
 :::
 :::continuity{ids="adapt"}
 In the adaptation Kael is still only [[Ember]] realm at the end of the trials {{src: Adaptation ep 11}}.
 :::
-:::
+::::
 
 ## Trivia
 
@@ -68,14 +68,14 @@ In the adaptation Kael is still only [[Ember]] realm at the end of the trials {{
 
 Mira is Kael's constant companion and the first person he trusts.
 
-:::diff
+::::diff
 :::continuity{ids="wn"}
 In the web novel she is introduced as Kael's younger sister {{src: Web Novel ch 2}}.
 :::
 :::continuity{ids="adapt"}
 In the adaptation she is a childhood friend from the same alley {{src: Adaptation ep 1}}.
 :::
-:::
+::::
 
 :::spoiler{src="wn" at=180}
 In the web novel, ${SECRET.sisterTwist}.
@@ -103,11 +103,11 @@ A scarred veteran who becomes Kael's teacher. Gruff, patient, and fond of terrib
 
 Orrin trains Kael through the [[Lantern Trials]] and later takes command of the line at [[Keld Pass]].
 
-:::continuity{ids="wn"}
+::::continuity{ids="wn"}
 :::spoiler{src="wn" at=140}
 In the web novel, ${SECRET.orrinDeath}.
 :::
-:::
+::::
 
 :::continuity{ids="adapt"}
 In the adaptation Orrin survives the siege and retires to [[Ashmere]] {{src: Adaptation ep 16}}.
@@ -203,7 +203,7 @@ ${SECRET.sableIdentity}.
 
   // ---------- events ----------
   P('event', 'Night of Cold Fires', { status: 'complete', fields: { when: 'Year 0', participants: ['Kael Marrow', 'Orrin Vale'], where: 'Ashmere' }, body: `{{infobox}}\n\nThe disaster that left half of [[Ashmere]] burning with colorless flames and orphaned Kael.\n` }),
-  P('event', 'Siege of Keld Pass', { status: 'draft', fields: { when: 'Year 6', participants: ['Orrin Vale', 'Brannoch Keld', 'Ilex Thorne'], where: 'Keld Pass' }, body: `{{infobox}}\n\nThe three-week siege that ends the third arc.\n\n:::continuity{ids="wn"}\n:::spoiler{src="wn" at=140}\n${SECRET.orrinDeath}.\n:::\n:::\n` }),
+  P('event', 'Siege of Keld Pass', { status: 'draft', fields: { when: 'Year 6', participants: ['Orrin Vale', 'Brannoch Keld', 'Ilex Thorne'], where: 'Keld Pass' }, body: `{{infobox}}\n\nThe three-week siege that ends the third arc.\n\n::::continuity{ids="wn"}\n:::spoiler{src="wn" at=140}\n${SECRET.orrinDeath}.\n:::\n::::\n` }),
   P('event', 'The Great Quench', { status: 'draft', reveal: arc('a5'), fields: { when: 'Year 9' }, body: `{{infobox}}\n\nThe finale event.\n\n:::spoiler{src="wn" at=285}\n${SECRET.quenchTruth}.\n:::\n` }),
 
   // ---------- arcs ----------
@@ -225,6 +225,7 @@ export const SERIES: StarterWorld = {
   slug: 'the-ashen-ascent',
   pack: 'series-lore',
   secrets: SERIES_SECRETS,
+  spoilerSecrets: SERIES_SECRETS,
   world: {
     name: 'The Ashen Ascent', slug: 'the-ashen-ascent', accent: '#f08a4b',
     description: 'An invented system web-novel setting used to demo every Worldloom feature: two continuities, spoiler gates, citations and claims.',

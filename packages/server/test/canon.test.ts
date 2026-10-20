@@ -62,33 +62,33 @@ describe('continuity compare & switching', () => {
 
 describe('canon integrity', () => {
   it('rejects bad references and ranges', async () => {
-    const sources = (await call('GET', '/sources')).body;
+    const sources = (await call('GET', '/sources?mode=author')).body;
     expect((await call('PUT', '/sources', [{ ...sources[0], continuityId: 'nope' }])).status).toBe(400);
-    const arcs = (await call('GET', '/arcs')).body;
+    const arcs = (await call('GET', '/arcs?mode=author')).body;
     expect((await call('PUT', '/arcs', [{ ...arcs[0], ranges: { wn: { from: 9, to: 2 } } }])).status).toBe(400);
     expect((await call('PUT', '/arcs', [{ ...arcs[0], ranges: { ghost: { from: 1, to: 2 } } }])).status).toBe(400);
     expect((await call('PUT', '/continuities', [])).status).toBe(400);
   });
   it('blocks removing things that pages still use', async () => {
-    const sources = (await call('GET', '/sources')).body;
+    const sources = (await call('GET', '/sources?mode=author')).body;
     const r = await call('PUT', '/sources', sources.filter((s: { id: string }) => s.id !== 'wn'));
     expect(r.status).toBe(409);
     expect(r.body.error.message).toMatch(/referenced by \d+ page/);
-    const conts = (await call('GET', '/continuities')).body;
+    const conts = (await call('GET', '/continuities?mode=author')).body;
     expect((await call('PUT', '/continuities', conts.filter((c: { id: string }) => c.id !== 'adapt'))).status).toBe(409);
-    const arcs = (await call('GET', '/arcs')).body;
+    const arcs = (await call('GET', '/arcs?mode=author')).body;
     expect((await call('PUT', '/arcs', arcs.filter((a: { id: string }) => a.id !== 'a4'))).status).toBe(409);
   });
   it('cascades removal of an unused source into arc ranges and progress', async () => {
     await call('PUT', '/progress', { sources: { recap: 3 } });
-    const sources = (await call('GET', '/sources')).body;
+    const sources = (await call('GET', '/sources?mode=author')).body;
     expect((await call('PUT', '/sources', sources.filter((s: { id: string }) => s.id !== 'recap'))).status).toBe(200);
-    const arcs = (await call('GET', '/arcs')).body;
+    const arcs = (await call('GET', '/arcs?mode=author')).body;
     expect(arcs.every((a: { ranges: object }) => !('recap' in a.ranges))).toBe(true);
     expect((await call('GET', '/progress')).body.sources.recap).toBeUndefined();
   });
   it('normalises exactly one primary continuity', async () => {
-    const conts = (await call('GET', '/continuities')).body.map((c: object) => ({ ...c, isPrimary: false }));
+    const conts = (await call('GET', '/continuities?mode=author')).body.map((c: object) => ({ ...c, isPrimary: false }));
     const r = await call('PUT', '/continuities', conts);
     expect(r.body.filter((c: { isPrimary: boolean }) => c.isPrimary)).toHaveLength(1);
     expect((await call('PUT', '/continuities', r.body.map((c: object) => ({ ...c, isPrimary: true })))).status).toBe(400);

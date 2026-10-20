@@ -3,7 +3,7 @@ import path from 'node:path';
 import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
 import { z, ZodError } from 'zod';
 import {
-  API_PREFIX, ArcSchema, ContinuitySchema, EntityTypeSchema, TypePackSchema, PageCreateSchema, PagePatchSchema, ProgressSchema, SourceSchema,
+  API_PREFIX, ArcSchema, RelationSchema, RevealSchema, ContinuitySchema, EntityTypeSchema, TypePackSchema, PageCreateSchema, PagePatchSchema, ProgressSchema, SourceSchema,
   type Progress,
 } from '@worldloom/shared';
 import { WorldManager, SettingsSchema, defaultDataDir } from './manager';
@@ -30,9 +30,14 @@ function parse<S extends z.ZodTypeAny>(schema: S, data: unknown): z.infer<S> {
   return r.data;
 }
 
+declare module 'fastify' { interface FastifyInstance { routeTable: Array<{ method: string; url: string }> } }
+
 export async function buildApp({ token, manager, log }: AppOptions): Promise<FastifyInstance> {
   const app = Fastify({ logger: false, bodyLimit: 5 * 1024 * 1024, genReqId: () => crypto.randomBytes(6).toString('hex') });
   const want = Buffer.from(token);
+  const routeTable: Array<{ method: string; url: string }> = [];
+  app.addHook('onRoute', (o) => { for (const m of [o.method].flat()) if (m !== 'HEAD' && m !== 'OPTIONS') routeTable.push({ method: m, url: o.url }); });
+  app.decorate('routeTable', routeTable);
 
   app.addContentTypeParser(['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/svg+xml', 'application/octet-stream'], { parseAs: 'buffer', bodyLimit: MAX_ASSET_BYTES + 1024 }, (_r, body, done) => done(null, body));
 
@@ -88,7 +93,10 @@ export async function buildApp({ token, manager, log }: AppOptions): Promise<Fas
     reply.status(201);
     return created.world;
   });
-  app.get(W, async (req) => (await repo(req)).world);
+  app.get(W, async (req) => {
+    const rp = await repo(req);
+    return rp.worldView(viewerOf(rp, parse(ModeQ, req.query)));
+  });
   app.patch(W, async (req) => {
     const b = parse(z.object({ name: z.string().min(1), description: z.string(), accent: z.string(), cover: z.string(), theme: z.object({ readingFont: z.enum(['serif', 'sans']) }) }).partial(), req.body);
     return (await repo(req)).updateWorld((w) => Object.assign(w, b));
@@ -141,7 +149,10 @@ export async function buildApp({ token, manager, log }: AppOptions): Promise<Fas
     return rp.types;
   });
   for (const [name, schema, key] of [['continuities', ContinuitySchema, 'continuities'], ['sources', SourceSchema, 'sources'], ['arcs', ArcSchema, 'arcs']] as const) {
-    app.get(`${W}/${name}`, async (req) => (await repo(req)).world[key]);
+    app.get(`${W}/${name}`, async (req) => {
+      const rp = await repo(req);
+      return rp.worldView(viewerOf(rp, parse(ModeQ, req.query)))[key];
+    });
     app.put(`${W}/${name}`, async (req) => {
       const items = parse(z.array(schema), req.body);
       const ids = items.map((i) => i.id);
@@ -163,11 +174,13 @@ export async function buildApp({ token, manager, log }: AppOptions): Promise<Fas
     return w.progress;
   });
   app.post(`${W}/progress/reveal`, async (req) => {
-    const { key, undo } = parse(z.object({ key: z.string().min(1), undo: z.boolean().optional() }), req.body);
+    const { key, undo, clear } = parse(z.object({ key: z.string().min(1).optional(), undo: z.boolean().optional(), clear: z.boolean().optional() }), req.body);
+    if (!key && !clear) throw badRequest('key or clear required');
     const w = await (await repo(req)).updateWorld((w) => {
       const s = new Set(w.progress.revealed);
-      if (undo) s.delete(key);
-      else s.add(key);
+      if (clear) s.clear();
+      else if (undo) s.delete(key!);
+      else s.add(key!);
       w.progress.revealed = [...s];
     });
     return w.progress;
@@ -211,7 +224,7 @@ export async function buildApp({ token, manager, log }: AppOptions): Promise<Fas
   });
   app.patch(`${W}/pages/:ref`, async (req) => {
     const rp = await repo(req);
-    return rp.patch(rp.raw((req.params as { ref: string }).ref).id, parse(PagePatchSchema, req.body));
+    return rp.patch(rp.raw((req.params as { ref: string }).ref).id, parse(PagePatchSchema.extend({ reveal: RevealSchema.nullable().optional() }), req.body));
   });
   app.delete(`${W}/pages/:ref`, async (req) => {
     const rp = await repo(req);
@@ -227,6 +240,7 @@ export async function buildApp({ token, manager, log }: AppOptions): Promise<Fas
   app.post(`${W}/tx/:id/undo`, async (req) => ({ restoredFiles: await (await repo(req)).undoTx((req.params as { id: string }).id) }));
 
   app.post(`${W}/render`, async (req) => {
+    authorOnly(parse(ModeQ, req.query));
     const b = parse(z.object({ body: z.string().max(2_000_000), pageId: z.string().optional(), continuity: z.string().optional() }), req.body);
     return (await repo(req)).preview(b.body, b.pageId, b.continuity);
   });
@@ -246,6 +260,21 @@ export async function buildApp({ token, manager, log }: AppOptions): Promise<Fas
     const rp = await repo(req);
     const q = parse(ModeQ, req.query);
     return rp.backlinks((req.params as { ref: string }).ref, viewerOf(rp, q));
+  });
+  app.get(`${W}/relations`, async (req) => {
+    const rp = await repo(req);
+    const q = parse(ModeQ, req.query);
+    return rp.relations(viewerOf(rp, q), q.cont);
+  });
+  app.get(`${W}/relations/explicit`, async (req) => {
+    authorOnly(parse(ModeQ, req.query));
+    return (await repo(req)).relationsFile.get()?.relations ?? [];
+  });
+  app.put(`${W}/relations/explicit`, async (req) => (await repo(req)).setRelations(parse(z.array(RelationSchema), req.body)));
+  app.get(`${W}/card/:ref`, async (req) => {
+    const rp = await repo(req);
+    const q = parse(ModeQ, req.query);
+    return rp.card((req.params as { ref: string }).ref, viewerOf(rp, q), q.cont);
   });
   app.get(`${W}/categories`, async (req) => {
     const rp = await repo(req);

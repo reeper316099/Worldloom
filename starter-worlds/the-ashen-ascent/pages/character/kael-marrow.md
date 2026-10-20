@@ -59,14 +59,14 @@ Chapter 120 reveals that his core is a splinter of the Cold Furnace, which is wh
 
 ## Continuity differences
 
-:::diff
+::::diff
 :::continuity{ids="wn"}
 In the web novel Kael reaches [[Cinder]] realm by chapter 100 {{src: Web Novel ch 100}}.
 :::
 :::continuity{ids="adapt"}
 In the adaptation Kael is still only [[Ember]] realm at the end of the trials {{src: Adaptation ep 11}}.
 :::
-:::
+::::
 
 ## Trivia
 

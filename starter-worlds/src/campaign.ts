@@ -9,7 +9,8 @@ const SECRET = {
   rookPlan: 'Captain Rook plans to sink the harbor chain at the next spring tide',
   bellTruth: 'The Drowned Bell tolls when a Syndicate courier dies',
 };
-export const CAMPAIGN_SECRETS = Object.values(SECRET);
+const SPOILERS = ['Rook is seen leaving the lighthouse at night', 'a courier is found dead at the door'];
+export const CAMPAIGN_SECRETS = [...Object.values(SECRET), ...SPOILERS];
 const ses = (at: number) => ({ sourceId: 'sessions', at });
 const P = (type: string, title: string, d: Omit<PageDef, 'type' | 'title'>): PageDef => ({ type, title, ...d });
 
@@ -37,6 +38,7 @@ export const CAMPAIGN: StarterWorld = {
   slug: 'gloamreach-campaign',
   pack: 'ttrpg-campaign',
   secrets: CAMPAIGN_SECRETS,
+  spoilerSecrets: SPOILERS,
   world: {
     name: 'Gloamreach Campaign', slug: 'gloamreach-campaign', accent: '#38bdf8',
     description: 'An invented TTRPG campaign demo with DM-only content and session logs.',

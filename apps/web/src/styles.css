@@ -102,3 +102,6 @@ table.cmp { width: 100%; border-collapse: collapse; } table.cmp td, table.cmp th
 table.cmp tr.differs td { background: color-mix(in srgb, var(--warning) 12%, transparent); } table.cmp tr.differs td:nth-child(n+2) { font-weight: 600; }
 .claims li { display: flex; gap: 6px; align-items: baseline; font-size: .85rem; } .claim-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--text-muted); } .claim-dot.confirmed { background: var(--success); } .claim-dot.inferred { background: var(--warning); } .claim-dot.theory { background: var(--accent); } .claim-dot.retconned { background: var(--danger); }
 .warn { color: var(--warning); }
+.hovercard { position: fixed; z-index: 40; width: 320px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); padding: 12px 14px; pointer-events: none; }
+.infobox-row.gated { cursor: pointer; } .infobox-row.gated:hover .v { color: var(--primary); }
+.dm-only { border-left: 3px solid var(--danger); padding-left: 12px; } .gate-btn { opacity: .5; } .gate-btn.on { opacity: 1; color: var(--warning); }
