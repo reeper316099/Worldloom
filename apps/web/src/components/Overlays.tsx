@@ -19,7 +19,7 @@ export function Help() {
   if (!help) return null;
   const rows: Array<[string, string]> = [
     ['Ctrl/Cmd+K', 'Command palette & search'], ['Ctrl/Cmd+P', 'Quick open page'], ['Ctrl/Cmd+E', 'Edit / preview'],
-    ['Ctrl/Cmd+Shift+S', 'Author / reader (spoiler) mode'], ['[  ]', 'Back / forward'], ['?', 'This help'],
+    ['Ctrl/Cmd+Shift+S', 'Author / reader (spoiler) mode'], ['G / T', 'Graph / timeline'], ['[  ]', 'Back / forward'], ['?', 'This help'],
   ];
   return (
     <div className="overlay" onClick={() => setHelp(false)}>

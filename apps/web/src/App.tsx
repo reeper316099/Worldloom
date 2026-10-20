@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { Component, useEffect, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useApp } from './store';
 import { go, useRoute } from './router';
@@ -12,6 +12,13 @@ import { SearchScreen } from './screens/SearchScreen';
 import { TypesScreen } from './screens/TypesScreen';
 import { CanonScreen } from './screens/CanonScreen';
 import { CompareScreen } from './screens/CompareScreen';
+import { GraphScreen } from './screens/GraphScreen';
+import { TreeScreen } from './screens/TreeScreen';
+import { TimelineScreen } from './screens/TimelineScreen';
+import { TiersScreen } from './screens/TiersScreen';
+import { CompareManyScreen } from './screens/CompareManyScreen';
+import { BoardsScreen } from './screens/BoardsScreen';
+import { WorldNav } from './components/WorldNav';
 import { Palette } from './components/Palette';
 import { Toasts, Help } from './components/Overlays';
 import { ProgressPanel } from './components/ProgressPanel';
@@ -62,6 +69,8 @@ function useHotkeys(slug?: string) {
         if (/\/edit$/.test(h)) go(h.replace(/\/edit$/, ''));
         else if (/\/p\/[^/]+$/.test(h)) go(h + '/edit');
       } else if (!typing && e.key === '?') s.setHelp(true);
+      else if (!typing && slug && !mod && k === 'g') go(`/w/${slug}/graph`);
+      else if (!typing && slug && !mod && k === 't') go(`/w/${slug}/timeline`);
       else if (!typing && e.key === '[') history.back();
       else if (!typing && e.key === ']') history.forward();
       else if (e.key === 'Escape') { s.openPalette(null); s.setHelp(false); }
@@ -85,6 +94,16 @@ function ProgressDialog({ slug }: { slug?: string }) {
   );
 }
 
+/** A crashing screen should never blank the whole app. */
+class Boundary extends Component<{ children: ReactNode; resetKey: string }, { err?: Error; key: string }> {
+  state: { err?: Error; key: string } = { key: this.props.resetKey };
+  static getDerivedStateFromError(err: Error) { return { err }; }
+  static getDerivedStateFromProps(p: { resetKey: string }, s: { key: string }) { return p.resetKey !== s.key ? { err: undefined, key: p.resetKey } : null; }
+  render() {
+    return this.state.err ? <div className="card" role="alert"><h3>Something went wrong on this screen</h3><pre className="muted" style={{ whiteSpace: 'pre-wrap' }}>{this.state.err.message}</pre><a className="btn" href="#/">Back to worlds</a></div> : this.props.children;
+  }
+}
+
 export function App() {
   const route = useRoute();
   const { mode, toggleMode, setTheme, theme, focus, continuity } = useApp();
@@ -104,6 +123,12 @@ export function App() {
   else if (kind === 'p' && ref && extra === 'edit') screen = <EditorScreen w={slug} ref_={ref} />;
   else if (kind === 'p' && ref) screen = <PageScreen w={slug} ref_={ref} />;
   else if (kind === 'new') screen = <NewPage w={slug} title={route.query.get('title') ?? ''} />;
+  else if (kind === 'graph') screen = <GraphScreen w={slug} />;
+  else if (kind === 'tree') screen = <TreeScreen w={slug} />;
+  else if (kind === 'timeline') screen = <TimelineScreen w={slug} />;
+  else if (kind === 'tiers') screen = <TiersScreen w={slug} />;
+  else if (kind === 'compare') screen = <CompareManyScreen w={slug} />;
+  else if (kind === 'boards') screen = <BoardsScreen w={slug} id={ref} />;
   else if (kind === 'canon') screen = <CanonScreen w={slug} />;
   else if (kind === 'types') screen = <TypesScreen w={slug} />;
   else if (kind === 'search') screen = <SearchScreen w={slug} text={route.query.get('q') ?? ''} />;
@@ -127,8 +152,6 @@ export function App() {
           </select>
         )}
         {slug && <button className="btn ghost" onClick={() => useApp.getState().setProgress(true)}>Progress</button>}
-        {slug && <a className="btn ghost" href={`#/w/${slug}/canon`}>Canon</a>}
-        {slug && <a className="btn ghost" href={`#/w/${slug}/types`}>Types</a>}
         <button className="btn ghost" onClick={() => useApp.getState().openPalette('command')} aria-label="Open command palette">⌘K</button>
         <button className={`pill ${mode}`} title="Toggle spoiler mode (Ctrl/Cmd+Shift+S)" onClick={() => { toggleMode(); void qc.invalidateQueries(); }}>
           {mode === 'author' ? '✎ Author mode' : '👁 Reader mode'}
@@ -137,7 +160,8 @@ export function App() {
           {theme === 'dark' ? '🌙' : theme === 'light' ? '☀️' : '🖥'}
         </button>
       </header>
-      <main className="main"><div className="wrap">{screen}</div></main>
+      {slug ? <WorldNav slug={slug} /> : <div />}
+      <main className="main"><div className="wrap"><Boundary resetKey={location.hash}>{screen}</Boundary></div></main>
       <Palette slug={slug} />
       <Help />
       <ProgressDialog slug={slug} />

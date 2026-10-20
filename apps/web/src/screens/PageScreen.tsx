@@ -59,6 +59,7 @@ export function PageScreen({ w, ref_ }: { w: string; ref_: string }) {
   return (
     <>
       <div className="hero">
+        {d.breadcrumbs.length > 0 && <nav className="crumbs" aria-label="Location" style={{ marginBottom: 6 }}>{d.breadcrumbs.map((b) => <span key={b.id}><a href={`#/w/${w}/p/${b.slug}`}>{b.title}</a> ›</span>)}</nav>}
         <div className="row">
           <span className="badge">{d.typeName}</span><span className={`badge ${d.status}`}>{d.status}</span>
           {d.dmOnly && <span className="badge">DM only</span>}

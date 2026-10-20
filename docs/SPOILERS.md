@@ -15,3 +15,6 @@ Config endpoints (`/worlds/:w`, `/arcs`) mask arc names/summaries and gated tier
 Installs both demo worlds at zero progress with `hideTitles` on, walks **every registered GET route** (all pages × ids/slugs, search with probe terms, compare, cards, relations…) in default and player mode, and fails on any gated string or gated title. A route table check fails the build if a GET route is added without being classified `filtered`, `author-only`, `safe` or `skip`. A control test proves the check can fail (with `showAll` every secret renders), and mutating the visibility code makes the suite fail.
 
 Not yet covered because the features don't exist yet: graph, timeline, tier ladders (M7), exports (M8). They must be added to the classification table when built.
+
+## Visual tools (M7)
+Graph, trees, timeline, tier ladders, multi-compare and tier-list boards are all filtered server-side and covered by the leak suite. Notable rules: a timeline event is shown only if its own gate, its arc, and *every page it mentions* are visible; relation edges require both endpoint pages and the edge gate; gated tiers disappear from ladders; a reader saving a tier list never drops placements of pages they cannot see (the server merges them back). Maps and cosmology diagrams (stretch goals) are not implemented yet.
