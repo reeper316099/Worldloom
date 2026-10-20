@@ -4,12 +4,15 @@ jobs:
   test:
     strategy:
       fail-fast: false
-      matrix: { os: [ubuntu-latest, windows-latest, macos-latest] }
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 22, cache: npm }
+        with:
+          node-version: 22
+          cache: npm
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
@@ -20,7 +23,10 @@ jobs:
       - name: e2e (Linux, xvfb)
         run: xvfb-run --auto-servernum npm run e2e
         if: runner.os == 'Linux'
-        env: { CI: 'true' }
+        env:
+          CI: 'true'
       - uses: actions/upload-artifact@v4
         if: failure()
-        with: { name: e2e-${{ matrix.os }}, path: test-results }
+        with:
+          name: e2e-${{ matrix.os }}
+          path: test-results

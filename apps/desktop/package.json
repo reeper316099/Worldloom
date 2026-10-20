@@ -5,7 +5,10 @@
   "description": "Local-first wiki builder for deep fictional lore",
   "private": true,
   "main": "dist/desktop.cjs",
-  "author": "Worldloom contributors",
+  "author": {
+    "name": "Worldloom contributors",
+    "email": "worldloom@users.noreply.github.com"
+  },
   "license": "MIT",
   "scripts": {
     "build": "node ../../scripts/build-desktop.mjs",
@@ -42,7 +45,8 @@
         "AppImage",
         "deb"
       ],
-      "category": "Office"
+      "category": "Office",
+      "maintainer": "Worldloom contributors <worldloom@users.noreply.github.com>"
     },
     "electronVersion": "34.5.8"
   },
@@ -50,5 +54,6 @@
     "electron": "34.5.8",
     "electron-builder": "^25.1.8",
     "esbuild": "^0.24.0"
-  }
+  },
+  "homepage": "https://github.com/reeper316099/Worldloom"
 }
