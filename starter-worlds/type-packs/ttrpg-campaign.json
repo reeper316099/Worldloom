@@ -1,0 +1,234 @@
+{
+  "description": "NPCs, locations, quests and session logs, with DM-only content support.",
+  "kind": "worldloom-type-pack",
+  "name": "TTRPG campaign",
+  "schemaVersion": 1,
+  "types": [
+    {
+      "bodyTemplate": "{{infobox}}\n\n## Backstory\n\n## Notes\n",
+      "fields": [
+        {
+          "key": "player",
+          "label": "Player",
+          "perContinuity": false,
+          "type": "text"
+        },
+        {
+          "key": "class",
+          "label": "Class / role",
+          "perContinuity": false,
+          "type": "text"
+        },
+        {
+          "key": "level",
+          "label": "Level",
+          "perContinuity": false,
+          "type": "number"
+        },
+        {
+          "key": "allies",
+          "label": "Allies",
+          "multiple": true,
+          "perContinuity": false,
+          "relationKind": "ally",
+          "relationTo": "npc",
+          "type": "relation"
+        }
+      ],
+      "icon": "user",
+      "id": "pc",
+      "name": "Player character",
+      "slug": "pc"
+    },
+    {
+      "bodyTemplate": "{{infobox}}\n\n## Description\n\n## Personality\n\n## Secrets\n\n:::dm\nDM-only notes.\n:::\n",
+      "fields": [
+        {
+          "key": "role",
+          "label": "Role",
+          "perContinuity": false,
+          "type": "text"
+        },
+        {
+          "key": "attitude",
+          "label": "Attitude",
+          "options": [
+            "friendly",
+            "neutral",
+            "hostile"
+          ],
+          "perContinuity": false,
+          "type": "select"
+        },
+        {
+          "key": "location",
+          "label": "Found at",
+          "multiple": false,
+          "perContinuity": false,
+          "relationKind": "found_at",
+          "relationTo": "location",
+          "type": "relation"
+        },
+        {
+          "key": "faction",
+          "label": "Faction",
+          "multiple": false,
+          "perContinuity": false,
+          "relationKind": "member_of",
+          "relationTo": "faction",
+          "type": "relation"
+        }
+      ],
+      "icon": "user",
+      "id": "npc",
+      "name": "NPC",
+      "slug": "npc"
+    },
+    {
+      "bodyTemplate": "{{infobox}}\n\n## Description\n\n## Points of interest\n\n:::dm\nDM-only notes.\n:::\n",
+      "fields": [
+        {
+          "key": "kind",
+          "label": "Kind",
+          "perContinuity": false,
+          "type": "text"
+        },
+        {
+          "key": "region",
+          "label": "Region",
+          "multiple": false,
+          "perContinuity": false,
+          "relationKind": "parent",
+          "relationTo": "location",
+          "type": "relation"
+        }
+      ],
+      "icon": "map-pin",
+      "id": "location",
+      "name": "Location",
+      "slug": "location"
+    },
+    {
+      "bodyTemplate": "{{infobox}}\n\n## Overview\n\n:::dm\nTrue agenda.\n:::\n",
+      "fields": [
+        {
+          "key": "goal",
+          "label": "Goal",
+          "perContinuity": false,
+          "type": "text"
+        },
+        {
+          "key": "leaders",
+          "label": "Leaders",
+          "multiple": true,
+          "perContinuity": false,
+          "relationKind": "leader",
+          "relationTo": "npc",
+          "type": "relation"
+        }
+      ],
+      "icon": "flag",
+      "id": "faction",
+      "name": "Faction",
+      "slug": "faction"
+    },
+    {
+      "bodyTemplate": "{{infobox}}\n\n## Hook\n\n## Objectives\n\n## Outcome\n",
+      "fields": [
+        {
+          "key": "state",
+          "label": "State",
+          "options": [
+            "rumor",
+            "active",
+            "completed",
+            "failed"
+          ],
+          "perContinuity": false,
+          "type": "select"
+        },
+        {
+          "key": "giver",
+          "label": "Given by",
+          "multiple": false,
+          "perContinuity": false,
+          "relationKind": "given_by",
+          "relationTo": "npc",
+          "type": "relation"
+        },
+        {
+          "key": "reward",
+          "label": "Reward",
+          "perContinuity": false,
+          "type": "text"
+        }
+      ],
+      "icon": "scroll",
+      "id": "quest",
+      "name": "Quest",
+      "slug": "quest"
+    },
+    {
+      "bodyTemplate": "## Recap\n\n## Key moments\n\n## Loose threads\n",
+      "fields": [
+        {
+          "key": "session",
+          "label": "Session #",
+          "perContinuity": false,
+          "type": "number"
+        },
+        {
+          "key": "played",
+          "label": "Date played",
+          "perContinuity": false,
+          "type": "date"
+        },
+        {
+          "key": "present",
+          "label": "Present",
+          "multiple": true,
+          "perContinuity": false,
+          "relationKind": "present",
+          "relationTo": "pc",
+          "type": "relation"
+        }
+      ],
+      "icon": "notebook",
+      "id": "session-log",
+      "name": "Session log",
+      "slug": "session-log"
+    },
+    {
+      "bodyTemplate": "{{infobox}}\n\n## Description\n\n:::dm\nTrue properties.\n:::\n",
+      "fields": [
+        {
+          "key": "holder",
+          "label": "Holder",
+          "multiple": false,
+          "perContinuity": false,
+          "relationKind": "held_by",
+          "relationTo": "npc",
+          "type": "relation"
+        },
+        {
+          "key": "effects",
+          "label": "Effects",
+          "perContinuity": false,
+          "type": "longtext"
+        }
+      ],
+      "icon": "gem",
+      "id": "item",
+      "name": "Item",
+      "slug": "item"
+    },
+    {
+      "bodyTemplate": "## Summary\n\n## Details\n",
+      "fields": [],
+      "icon": "book",
+      "id": "lore",
+      "name": "Lore",
+      "slug": "lore"
+    }
+  ]
+}

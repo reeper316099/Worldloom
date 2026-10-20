@@ -3,11 +3,12 @@ import path from 'node:path';
 import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
 import { z, ZodError } from 'zod';
 import {
-  API_PREFIX, ArcSchema, ContinuitySchema, EntityTypeSchema, PageCreateSchema, PagePatchSchema, ProgressSchema, SourceSchema,
+  API_PREFIX, ArcSchema, ContinuitySchema, EntityTypeSchema, TypePackSchema, PageCreateSchema, PagePatchSchema, ProgressSchema, SourceSchema,
   type Progress,
 } from '@worldloom/shared';
 import { WorldManager, SettingsSchema, defaultDataDir } from './manager';
 import { ApiError, badRequest } from './errors';
+import { BUILTIN_PACKS } from './packs';
 import { readAsset, storeAsset, MAX_ASSET_BYTES } from './assets';
 import type { WorldRepo } from './repo';
 
@@ -82,7 +83,7 @@ export async function buildApp({ token, manager, log }: AppOptions): Promise<Fas
   // ----- worlds -----
   app.get(`${r}/worlds`, async () => manager.summaries());
   app.post(`${r}/worlds`, async (req, reply) => {
-    const b = parse(z.object({ name: z.string().min(1), slug: z.string().optional(), description: z.string().optional(), accent: z.string().optional(), continuities: z.array(ContinuitySchema).optional(), sources: z.array(SourceSchema).optional() }), req.body);
+    const b = parse(z.object({ pack: z.string().optional(), name: z.string().min(1), slug: z.string().optional(), description: z.string().optional(), accent: z.string().optional(), continuities: z.array(ContinuitySchema).optional(), sources: z.array(SourceSchema).optional() }), req.body);
     const created = await manager.create(b);
     reply.status(201);
     return created.world;
@@ -96,6 +97,37 @@ export async function buildApp({ token, manager, log }: AppOptions): Promise<Fas
     parse(z.object({ confirm: z.literal('yes') }), req.query);
     await manager.remove((req.params as { w: string }).w);
     reply.status(204);
+  });
+
+  // ----- starter worlds & type packs -----
+  app.get(`${r}/starter-worlds`, async () => manager.starters());
+  app.post(`${r}/starter-worlds/:id/install`, async (req, reply) => {
+    const created = await manager.installStarter((req.params as { id: string }).id);
+    reply.status(201);
+    return created.world;
+  });
+  app.get(`${r}/type-packs`, async () => Object.entries(BUILTIN_PACKS).map(([id, p]) => ({ id, name: p.name, description: p.description, types: p.types.length })));
+  app.get(`${r}/type-packs/:id`, async (req) => BUILTIN_PACKS[(req.params as { id: string }).id] ?? Promise.reject(new ApiError(404, 'not_found', 'type pack not found')));
+  app.get(`${W}/type-pack/export`, async (req) => {
+    const rp = await repo(req);
+    return TypePackSchema.parse({ name: `${rp.world.name} types`, description: 'Exported from Worldloom', types: rp.types });
+  });
+  app.post(`${W}/type-pack/import`, async (req) => {
+    const rp = await repo(req);
+    const b = parse(z.object({ pack: TypePackSchema, mode: z.enum(['add', 'overwrite', 'replace']).default('add') }), req.body);
+    const have = new Map(rp.types.map((t) => [t.slug, t]));
+    const added: string[] = [], updated: string[] = [], skipped: string[] = [];
+    let next = b.mode === 'replace' ? [] : [...rp.types];
+    for (const t of b.pack.types) {
+      if (b.mode === 'replace') { next.push(t); added.push(t.slug); }
+      else if (!have.has(t.slug)) { next.push(t); added.push(t.slug); }
+      else if (b.mode === 'overwrite') { next = next.map((x) => (x.slug === t.slug ? t : x)); updated.push(t.slug); }
+      else skipped.push(t.slug);
+    }
+    const used = new Set([...rp.pages.values()].map((p) => p.type));
+    for (const u of used) if (!next.some((t) => t.slug === u)) throw badRequest(`entity type "${u}" is still used by pages`);
+    await rp.setTypes(next);
+    return { added, updated, skipped };
   });
 
   // ----- entity types, continuities, sources, arcs -----

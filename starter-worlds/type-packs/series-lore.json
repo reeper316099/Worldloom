@@ -1,0 +1,404 @@
+{
+  "description": "Characters, factions, power systems and arcs for manhwa, anime and novel series.",
+  "kind": "worldloom-type-pack",
+  "name": "Series lore",
+  "schemaVersion": 1,
+  "types": [
+    {
+      "bodyTemplate": "{{infobox}}\n\n## Appearance\n\n## Personality\n\n## History\n\n## Abilities\n\n## Relationships\n\n## Trivia\n\n## Quotes\n",
+      "fields": [
+        {
+          "key": "species",
+          "label": "Species / race",
+          "perContinuity": false,
+          "type": "text"
+        },
+        {
+          "key": "status",
+          "label": "Status",
+          "options": [
+            "alive",
+            "dead",
+            "unknown"
+          ],
+          "perContinuity": true,
+          "type": "select"
+        },
+        {
+          "key": "firstAppearance",
+          "label": "First appearance",
+          "perContinuity": false,
+          "type": "text"
+        },
+        {
+          "key": "affiliations",
+          "label": "Affiliations",
+          "multiple": true,
+          "perContinuity": false,
+          "relationKind": "member_of",
+          "relationTo": "faction",
+          "type": "relation"
+        },
+        {
+          "key": "allies",
+          "label": "Allies",
+          "multiple": true,
+          "perContinuity": false,
+          "relationKind": "ally",
+          "relationTo": "character",
+          "type": "relation"
+        },
+        {
+          "key": "enemies",
+          "label": "Enemies",
+          "multiple": true,
+          "perContinuity": false,
+          "relationKind": "enemy",
+          "relationTo": "character",
+          "type": "relation"
+        },
+        {
+          "key": "mentor",
+          "label": "Mentor",
+          "multiple": false,
+          "perContinuity": false,
+          "relationKind": "master_student",
+          "relationTo": "character",
+          "type": "relation"
+        },
+        {
+          "key": "abilities",
+          "label": "Abilities",
+          "multiple": true,
+          "perContinuity": false,
+          "relationKind": "knows",
+          "relationTo": "ability",
+          "type": "relation"
+        },
+        {
+          "key": "items",
+          "label": "Items",
+          "multiple": true,
+          "perContinuity": false,
+          "relationKind": "owns",
+          "relationTo": "item",
+          "type": "relation"
+        },
+        {
+          "key": "tier",
+          "label": "Tier",
+          "perContinuity": true,
+          "tierSystemId": "tempering",
+          "type": "tier"
+        }
+      ],
+      "icon": "user",
+      "id": "character",
+      "name": "Character",
+      "slug": "character"
+    },
+    {
+      "bodyTemplate": "{{infobox}}\n\n## Overview\n\n## Hierarchy\n\n## History\n",
+      "fields": [
+        {
+          "key": "kind",
+          "label": "Kind",
+          "perContinuity": false,
+          "type": "text"
+        },
+        {
+          "key": "leaders",
+          "label": "Leaders",
+          "multiple": true,
+          "perContinuity": false,
+          "relationKind": "leader",
+          "relationTo": "character",
+          "type": "relation"
+        },
+        {
+          "key": "members",
+          "label": "Notable members",
+          "multiple": true,
+          "perContinuity": false,
+          "relationKind": "member",
+          "relationTo": "character",
+          "type": "relation"
+        },
+        {
+          "key": "territory",
+          "label": "Territory",
+          "multiple": true,
+          "perContinuity": false,
+          "relationKind": "holds",
+          "relationTo": "location",
+          "type": "relation"
+        },
+        {
+          "key": "allies",
+          "label": "Allies",
+          "multiple": true,
+          "perContinuity": false,
+          "relationKind": "ally",
+          "relationTo": "faction",
+          "type": "relation"
+        },
+        {
+          "key": "enemies",
+          "label": "Enemies",
+          "multiple": true,
+          "perContinuity": false,
+          "relationKind": "enemy",
+          "relationTo": "faction",
+          "type": "relation"
+        }
+      ],
+      "icon": "flag",
+      "id": "faction",
+      "name": "Faction",
+      "slug": "faction"
+    },
+    {
+      "bodyTemplate": "{{infobox}}\n\n## Description\n\n## Notable events\n",
+      "fields": [
+        {
+          "key": "kind",
+          "label": "Kind",
+          "perContinuity": false,
+          "type": "text"
+        },
+        {
+          "key": "region",
+          "label": "Region",
+          "multiple": false,
+          "perContinuity": false,
+          "relationKind": "parent",
+          "relationTo": "location",
+          "type": "relation"
+        },
+        {
+          "key": "inhabitants",
+          "label": "Inhabitants",
+          "multiple": true,
+          "perContinuity": false,
+          "relationKind": "lives_in",
+          "relationTo": "character",
+          "type": "relation"
+        }
+      ],
+      "icon": "map-pin",
+      "id": "location",
+      "name": "Location",
+      "slug": "location"
+    },
+    {
+      "bodyTemplate": "{{infobox}}\n\n## Mechanics\n\n## Users\n\n## Evolution\n\n## Counters\n",
+      "fields": [
+        {
+          "key": "kind",
+          "label": "Kind",
+          "perContinuity": false,
+          "type": "text"
+        },
+        {
+          "key": "tier",
+          "label": "Tier",
+          "perContinuity": false,
+          "tierSystemId": "tempering",
+          "type": "tier"
+        },
+        {
+          "key": "cost",
+          "label": "Cost / limits",
+          "perContinuity": false,
+          "type": "longtext"
+        },
+        {
+          "key": "users",
+          "label": "Users",
+          "multiple": true,
+          "perContinuity": false,
+          "relationKind": "used_by",
+          "relationTo": "character",
+          "type": "relation"
+        },
+        {
+          "key": "counters",
+          "label": "Counters",
+          "multiple": true,
+          "perContinuity": false,
+          "relationKind": "counter",
+          "relationTo": "ability",
+          "type": "relation"
+        }
+      ],
+      "icon": "zap",
+      "id": "ability",
+      "name": "Ability",
+      "slug": "ability"
+    },
+    {
+      "bodyTemplate": "{{infobox}}\n\n## Effects\n\n## Origin\n",
+      "fields": [
+        {
+          "key": "owners",
+          "label": "Owners",
+          "multiple": true,
+          "perContinuity": false,
+          "relationKind": "owned_by",
+          "relationTo": "character",
+          "type": "relation"
+        },
+        {
+          "key": "tier",
+          "label": "Tier",
+          "perContinuity": false,
+          "tierSystemId": "tempering",
+          "type": "tier"
+        },
+        {
+          "key": "effects",
+          "label": "Effects",
+          "perContinuity": false,
+          "type": "longtext"
+        },
+        {
+          "key": "origin",
+          "label": "Origin",
+          "perContinuity": false,
+          "type": "text"
+        }
+      ],
+      "icon": "gem",
+      "id": "item",
+      "name": "Item",
+      "slug": "item"
+    },
+    {
+      "bodyTemplate": "{{infobox}}\n\n## Traits\n\n## Notable members\n",
+      "fields": [
+        {
+          "key": "habitat",
+          "label": "Habitat",
+          "perContinuity": false,
+          "type": "text"
+        },
+        {
+          "key": "traits",
+          "label": "Traits",
+          "perContinuity": false,
+          "type": "longtext"
+        }
+      ],
+      "icon": "users",
+      "id": "race",
+      "name": "Race / species",
+      "slug": "race"
+    },
+    {
+      "bodyTemplate": "{{infobox}}\n\n## Explanation\n\n## Rules\n\n## Loopholes\n\n## Examples\n",
+      "fields": [
+        {
+          "key": "kind",
+          "label": "Kind",
+          "perContinuity": false,
+          "type": "text"
+        }
+      ],
+      "icon": "book",
+      "id": "concept",
+      "name": "Concept / power system",
+      "slug": "concept"
+    },
+    {
+      "bodyTemplate": "{{infobox}}\n\n## Summary\n\n## Key events\n",
+      "fields": [
+        {
+          "key": "arcId",
+          "label": "Arc",
+          "perContinuity": false,
+          "type": "arc"
+        },
+        {
+          "key": "source",
+          "label": "Primary source",
+          "perContinuity": false,
+          "type": "source"
+        },
+        {
+          "key": "characters",
+          "label": "Characters involved",
+          "multiple": true,
+          "perContinuity": false,
+          "relationKind": "appears",
+          "relationTo": "character",
+          "type": "relation"
+        }
+      ],
+      "icon": "bookmark",
+      "id": "arc",
+      "name": "Arc summary",
+      "slug": "arc"
+    },
+    {
+      "bodyTemplate": "{{infobox}}\n\n## Summary\n\n## Aftermath\n",
+      "fields": [
+        {
+          "key": "when",
+          "label": "When",
+          "perContinuity": false,
+          "type": "inWorldDate"
+        },
+        {
+          "key": "participants",
+          "label": "Participants",
+          "multiple": true,
+          "perContinuity": false,
+          "relationKind": "participant",
+          "relationTo": "character",
+          "type": "relation"
+        },
+        {
+          "key": "where",
+          "label": "Location",
+          "multiple": false,
+          "perContinuity": false,
+          "relationKind": "at",
+          "relationTo": "location",
+          "type": "relation"
+        }
+      ],
+      "icon": "calendar",
+      "id": "event",
+      "name": "Event",
+      "slug": "event"
+    },
+    {
+      "bodyTemplate": "## Claim\n\n## Evidence\n\n## Counter-evidence\n",
+      "fields": [
+        {
+          "key": "confidence",
+          "label": "Confidence",
+          "options": [
+            "wild",
+            "plausible",
+            "likely"
+          ],
+          "perContinuity": false,
+          "type": "select"
+        }
+      ],
+      "icon": "lightbulb",
+      "id": "theory",
+      "name": "Theory",
+      "slug": "theory"
+    },
+    {
+      "bodyTemplate": "**Term** — definition.\n",
+      "fields": [],
+      "icon": "tag",
+      "id": "glossary",
+      "name": "Glossary term",
+      "slug": "glossary"
+    }
+  ]
+}

@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
 import { go } from '../router';
 import { useWorlds } from '../hooks';
+import { useQuery } from '@tanstack/react-query';
 import { useApp } from '../store';
 
 const TEMPLATES = {
@@ -25,6 +26,12 @@ const TEMPLATES = {
 export function Home() {
   const { data, isLoading, error } = useWorlds();
   const [creating, setCreating] = useState(false);
+  const qc = useQueryClient();
+  const starters = useQuery({ queryKey: ['starters'], queryFn: () => api.get<Array<{ id: string; name: string; description: string; accent: string; pages: number }>>('/starter-worlds') });
+  const install = async (id: string) => {
+    try { const w = await api.post<{ slug: string }>(`/starter-worlds/${id}/install`); await qc.invalidateQueries(); go(`/w/${w.slug}`); }
+    catch (e) { useApp.getState().toast((e as Error).message); }
+  };
   return (
     <>
       <div className="row" style={{ marginBottom: 24 }}>
@@ -39,9 +46,23 @@ export function Home() {
       {data && data.length === 0 && (
         <div className="card" style={{ textAlign: 'center', padding: 48 }}>
           <h2 style={{ marginTop: 0 }}>Welcome to Worldloom</h2>
-          <p className="muted">Build a spoiler-aware wiki for any fictional world. Starter demo worlds arrive with the next milestone.</p>
+          <p className="muted">Build a spoiler-aware wiki for any fictional world. Open a demo world below, or start your own.</p>
           <button className="btn primary" onClick={() => setCreating(true)}>Create my first world</button>
         </div>
+      )}
+      {starters.data && starters.data.length > 0 && (
+        <>
+          <h3 style={{ margin: '32px 0 12px' }}>Demo worlds</h3>
+          <div className="grid">
+            {starters.data.map((s) => (
+              <div key={s.id} className="card">
+                <strong>{s.name}</strong> <span className="muted">· {s.pages} pages</span>
+                <div className="muted" style={{ margin: '6px 0 12px' }}>{s.description}</div>
+                <button className="btn" onClick={() => void install(s.id)}>Open demo world</button>
+              </div>
+            ))}
+          </div>
+        </>
       )}
       <div className="grid">
         {data?.map((w) => (
@@ -74,7 +95,7 @@ function NewWorld({ close }: { close: () => void }) {
     setBusy(true);
     try {
       const t = TEMPLATES[tpl];
-      const w = await api.post<{ slug: string }>('/worlds', { name, accent, continuities: t.continuities, sources: t.sources });
+      const w = await api.post<{ slug: string }>('/worlds', { name, accent, pack: tpl === 'campaign' ? 'ttrpg-campaign' : tpl === 'series' ? 'series-lore' : undefined, continuities: t.continuities, sources: t.sources });
       await qc.invalidateQueries();
       close();
       go(`/w/${w.slug}`);

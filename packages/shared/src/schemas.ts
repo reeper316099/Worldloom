@@ -192,3 +192,13 @@ export type Revision = z.infer<typeof RevisionSchema>;
 
 export const ReadMode = z.enum(['reader', 'author']);
 export type ReadModeT = z.infer<typeof ReadMode>;
+
+/** Shareable bundle of entity types (import/export as JSON). */
+export const TypePackSchema = z.object({
+  schemaVersion: z.number().default(1),
+  kind: z.literal('worldloom-type-pack').default('worldloom-type-pack'),
+  name: z.string().min(1),
+  description: z.string().default(''),
+  types: z.array(EntityTypeSchema).min(1),
+});
+export type TypePack = z.infer<typeof TypePackSchema>;

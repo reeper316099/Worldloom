@@ -1,0 +1,231 @@
+{
+  "accent": "#f08a4b",
+  "arcs": [
+    {
+      "id": "a1",
+      "name": "Spark in Ashmere",
+      "order": 1,
+      "ranges": {
+        "adapt": {
+          "from": 1,
+          "to": 5
+        },
+        "recap": {
+          "from": 1,
+          "to": 1
+        },
+        "wn": {
+          "from": 1,
+          "to": 40
+        }
+      },
+      "summary": "Kael awakens his core."
+    },
+    {
+      "id": "a2",
+      "name": "The Lantern Trials",
+      "order": 2,
+      "ranges": {
+        "adapt": {
+          "from": 6,
+          "to": 11
+        },
+        "recap": {
+          "from": 2,
+          "to": 3
+        },
+        "wn": {
+          "from": 41,
+          "to": 95
+        }
+      },
+      "summary": "Guild trials."
+    },
+    {
+      "id": "a3",
+      "name": "Keld Pass",
+      "order": 3,
+      "ranges": {
+        "adapt": {
+          "from": 12,
+          "to": 16
+        },
+        "recap": {
+          "from": 4,
+          "to": 4
+        },
+        "wn": {
+          "from": 96,
+          "to": 150
+        }
+      },
+      "summary": "The siege."
+    },
+    {
+      "id": "a4",
+      "name": "The Cold Furnace",
+      "order": 4,
+      "ranges": {
+        "adapt": {
+          "from": 17,
+          "to": 21
+        },
+        "recap": {
+          "from": 5,
+          "to": 5
+        },
+        "wn": {
+          "from": 151,
+          "to": 220
+        }
+      },
+      "summary": "Descent into the furnace."
+    },
+    {
+      "id": "a5",
+      "name": "Crown of Ash",
+      "order": 5,
+      "ranges": {
+        "adapt": {
+          "from": 22,
+          "to": 24
+        },
+        "recap": {
+          "from": 6,
+          "to": 6
+        },
+        "wn": {
+          "from": 221,
+          "to": 300
+        }
+      },
+      "summary": "Finale."
+    }
+  ],
+  "continuities": [
+    {
+      "color": "#f08a4b",
+      "id": "wn",
+      "isPrimary": true,
+      "name": "Web Novel",
+      "order": 0
+    },
+    {
+      "color": "#38bdf8",
+      "id": "adapt",
+      "isPrimary": false,
+      "name": "Adaptation",
+      "order": 1
+    }
+  ],
+  "createdAt": "2026-01-01T00:00:00.000Z",
+  "description": "An invented system web-novel setting used to demo every Worldloom feature: two continuities, spoiler gates, citations and claims.",
+  "name": "The Ashen Ascent",
+  "progress": {
+    "impliedFloor": "conservative",
+    "revealed": [],
+    "showAll": false,
+    "sources": {
+      "adapt": 8,
+      "wn": 60
+    }
+  },
+  "schemaVersion": 1,
+  "slug": "the-ashen-ascent",
+  "sources": [
+    {
+      "continuityId": "wn",
+      "id": "wn",
+      "kind": "web_novel",
+      "name": "Web Novel",
+      "notes": "",
+      "units": {
+        "count": 300,
+        "label": "Chapter"
+      }
+    },
+    {
+      "continuityId": "adapt",
+      "id": "adapt",
+      "kind": "anime",
+      "name": "Adaptation",
+      "notes": "",
+      "units": {
+        "count": 24,
+        "label": "Episode"
+      }
+    },
+    {
+      "continuityId": "wn",
+      "id": "recap",
+      "kind": "video",
+      "name": "Recap Videos",
+      "notes": "Third-party recaps; unreliable for details.",
+      "units": {
+        "count": 6,
+        "label": "Episode"
+      }
+    }
+  ],
+  "theme": {
+    "readingFont": "serif"
+  },
+  "tierSystems": [
+    {
+      "id": "tempering",
+      "name": "Tempering Realms",
+      "scale": "ordinal",
+      "tiers": [
+        {
+          "color": "#9aa0b8",
+          "description": "First lit core.",
+          "id": "spark",
+          "name": "Spark",
+          "order": 1
+        },
+        {
+          "color": "#f5b84a",
+          "description": "",
+          "id": "ember",
+          "name": "Ember",
+          "order": 2
+        },
+        {
+          "color": "#f08a4b",
+          "description": "",
+          "id": "cinder",
+          "name": "Cinder",
+          "order": 3
+        },
+        {
+          "color": "#ff6b81",
+          "description": "",
+          "id": "flame",
+          "name": "Flame",
+          "order": 4
+        },
+        {
+          "color": "#f0a5ff",
+          "description": "",
+          "id": "blaze",
+          "name": "Blaze",
+          "order": 5
+        },
+        {
+          "color": "#7c5cff",
+          "description": "",
+          "id": "pyre",
+          "name": "Pyre",
+          "order": 6
+        },
+        {
+          "color": "#38bdf8",
+          "description": "Final realm.",
+          "id": "zenith",
+          "name": "Zenith",
+          "order": 7
+        }
+      ]
+    }
+  ]
+}

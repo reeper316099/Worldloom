@@ -1,0 +1,21 @@
+{
+  "relations": [
+    {
+      "fromId": "st_npc_ossian-pike",
+      "id": "r1",
+      "kind": "member_of",
+      "reveal": {
+        "at": 6,
+        "sourceId": "sessions"
+      },
+      "toId": "st_faction_saltglass-syndicate"
+    },
+    {
+      "fromId": "st_npc_marta-brine",
+      "id": "r2",
+      "kind": "ally",
+      "toId": "st_npc_ossian-pike"
+    }
+  ],
+  "schemaVersion": 1
+}

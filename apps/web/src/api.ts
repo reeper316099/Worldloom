@@ -35,7 +35,7 @@ export interface SourceT { id: string; name: string; kind: string; continuityId:
 export interface ArcT { id: string; name: string; order: number }
 export interface Progress { sources: Record<string, number>; arcCheckpoint?: string; showAll: boolean; revealed: string[] }
 export interface World { slug: string; name: string; description: string; accent: string; theme: { readingFont: 'serif' | 'sans' }; continuities: Continuity[]; sources: SourceT[]; arcs: ArcT[]; progress: Progress }
-export interface FieldDef { key: string; label: string; type: string; options?: string[]; multiple?: boolean; relationTo?: string; perContinuity?: boolean }
+export interface FieldDef { key: string; label: string; type: string; options?: string[]; multiple?: boolean; relationTo?: string; relationKind?: string; perContinuity?: boolean }
 export interface EntityType { id: string; name: string; slug: string; fields: FieldDef[]; bodyTemplate: string }
 export interface ListItem { id: string; title: string; slug: string; type?: string; status?: string; hidden: boolean; updatedAt?: string; aliases?: string[] }
 export interface InfoRow { key: string; label: string; type: string; value: unknown; hidden?: boolean }

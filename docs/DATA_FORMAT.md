@@ -19,3 +19,10 @@ Field values may be wrapped: `{ value, reveal, byContinuity: { <continuityId>: v
 
 Syntax: `[[Page]]`, `[[Page|label]]`, `[[Page#Section]]`, `[[type:Character/Name]]`, `{{infobox}}`, `{{toc}}`, `{{embed: Page#Section}}`,
 `{{src: WN ch 12}}`, `{{claim: confirmed|inferred|theory|retconned}}…{{/claim}}`, `:::continuity{ids="a,b"}`, `:::spoiler{src="wn" at=120}` (or `arc="id"`), `:::diff`.
+
+## Type packs & starter worlds
+
+A type pack is JSON: `{ kind: "worldloom-type-pack", name, description, types: [EntityType] }`; import modes: add new only, overwrite same slug, replace all (blocked if pages still use a removed type).
+Built-in packs live in `packages/server/src/packs.ts` and are exported to `starter-worlds/type-packs/`.
+Starter worlds (100% original content) are authored in `starter-worlds/src/*.ts` and generated into world folders with `npx tsx starter-worlds/src/build.ts`; a test fails if the committed files drift from the definitions.
+`:::dm` blocks and `dmOnly: true` pages are hidden in player view (`player=1`).

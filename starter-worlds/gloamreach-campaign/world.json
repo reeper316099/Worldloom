@@ -1,0 +1,68 @@
+{
+  "accent": "#38bdf8",
+  "arcs": [
+    {
+      "id": "act1",
+      "name": "Act I: Fog",
+      "order": 1,
+      "ranges": {
+        "sessions": {
+          "from": 1,
+          "to": 4
+        }
+      },
+      "summary": ""
+    },
+    {
+      "id": "act2",
+      "name": "Act II: Tide",
+      "order": 2,
+      "ranges": {
+        "sessions": {
+          "from": 5,
+          "to": 8
+        }
+      },
+      "summary": ""
+    }
+  ],
+  "continuities": [
+    {
+      "color": "#38bdf8",
+      "id": "campaign",
+      "isPrimary": true,
+      "name": "Campaign canon",
+      "order": 0
+    }
+  ],
+  "createdAt": "2026-01-01T00:00:00.000Z",
+  "description": "An invented TTRPG campaign demo with DM-only content and session logs.",
+  "name": "Gloamreach Campaign",
+  "progress": {
+    "impliedFloor": "conservative",
+    "revealed": [],
+    "showAll": false,
+    "sources": {
+      "sessions": 2
+    }
+  },
+  "schemaVersion": 1,
+  "slug": "gloamreach-campaign",
+  "sources": [
+    {
+      "continuityId": "campaign",
+      "id": "sessions",
+      "kind": "campaign",
+      "name": "Sessions",
+      "notes": "",
+      "units": {
+        "count": 12,
+        "label": "Session"
+      }
+    }
+  ],
+  "theme": {
+    "readingFont": "sans"
+  },
+  "tierSystems": []
+}

@@ -7,6 +7,8 @@ import { DATA_DIR_ENV, WorldSchema, slugify, type World } from '@worldloom/share
 import { JsonFile, zipBackup } from '@worldloom/jsonstore';
 import { WorldRepo, type RepoOptions } from './repo';
 import { badRequest, conflict, notFound } from './errors';
+import { BUILTIN_PACKS } from './packs';
+import { defaultStarterDir, installStarter, listStarters } from './starters';
 
 export const SettingsSchema = z.object({
   schemaVersion: z.number().default(1),
@@ -34,6 +36,7 @@ export class WorldManager {
   constructor(
     readonly dataDir: string,
     private repoOpts: RepoOptions = {},
+    readonly starterDir: string = defaultStarterDir(),
   ) {
     this.settingsFile = new JsonFile(path.join(dataDir, 'config', 'settings.json'), {
       schema: SettingsSchema, version: 1, defaults: () => SettingsSchema.parse({}), backupDir: path.join(dataDir, 'backups', 'files', 'config'),
@@ -94,7 +97,7 @@ export class WorldManager {
     }
     return out;
   }
-  async create(input: { name: string; slug?: string; description?: string; accent?: string; continuities?: World['continuities']; sources?: World['sources'] }) {
+  async create(input: { pack?: string; name: string; slug?: string; description?: string; accent?: string; continuities?: World['continuities']; sources?: World['sources'] }) {
     const base = input.slug ?? slugify(input.name);
     const existing = new Set(await this.slugs());
     if (input.slug && existing.has(base)) throw conflict(`world "${base}" already exists`);
@@ -112,6 +115,19 @@ export class WorldManager {
     }
     const dir = path.join(this.worldsDir(), slug);
     await new JsonFile(path.join(dir, 'world.json'), { schema: WorldSchema, version: 1 }).save(world);
+    const repo = await this.get(slug);
+    if (input.pack) {
+      const pack = BUILTIN_PACKS[input.pack];
+      if (!pack) throw badRequest(`unknown type pack "${input.pack}"`);
+      await repo.setTypes(pack.types);
+    }
+    return repo;
+  }
+  starters() {
+    return listStarters(this.starterDir);
+  }
+  async installStarter(id: string) {
+    const slug = await installStarter(this.starterDir, id, this.worldsDir(), new Set(await this.slugs()));
     return this.get(slug);
   }
   async remove(slug: string) {

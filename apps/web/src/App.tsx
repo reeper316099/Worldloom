@@ -9,6 +9,7 @@ import { PageScreen } from './screens/PageScreen';
 import { EditorScreen } from './screens/EditorScreen';
 import { NewPage } from './screens/NewPage';
 import { SearchScreen } from './screens/SearchScreen';
+import { TypesScreen } from './screens/TypesScreen';
 import { Palette } from './components/Palette';
 import { Toasts, Help } from './components/Overlays';
 
@@ -84,6 +85,7 @@ export function App() {
   else if (kind === 'p' && ref && extra === 'edit') screen = <EditorScreen w={slug} ref_={ref} />;
   else if (kind === 'p' && ref) screen = <PageScreen w={slug} ref_={ref} />;
   else if (kind === 'new') screen = <NewPage w={slug} title={route.query.get('title') ?? ''} />;
+  else if (kind === 'types') screen = <TypesScreen w={slug} />;
   else if (kind === 'search') screen = <SearchScreen w={slug} text={route.query.get('q') ?? ''} />;
   else screen = <Dashboard w={slug} />;
 
@@ -104,6 +106,7 @@ export function App() {
             {world.continuities.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         )}
+        {slug && <a className="btn ghost" href={`#/w/${slug}/types`}>Types</a>}
         <button className="btn ghost" onClick={() => useApp.getState().openPalette('command')} aria-label="Open command palette">⌘K</button>
         <button className={`pill ${mode}`} title="Toggle spoiler mode (Ctrl/Cmd+Shift+S)" onClick={() => { toggleMode(); void qc.invalidateQueries(); }}>
           {mode === 'author' ? '✎ Author mode' : '👁 Reader mode'}

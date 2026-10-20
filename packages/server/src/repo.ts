@@ -310,6 +310,7 @@ export class WorldRepo {
     return {
       resolveLink,
       continuity,
+      hideDm: v.mode === 'reader' && v.player,
       isRevealed: (r: Parameters<typeof revealOk>[1], key: string) => revealOk(v, r, `${p.id}:${key}`),
       resolveCitation: (text: string) => {
         const t = text.toLowerCase();
@@ -412,7 +413,7 @@ export class WorldRepo {
       const from = this.pages.get(fromId)!;
       if (!pageVisible(v, from)) continue;
       if (v.mode === 'reader') {
-        const red = redact(from.body, { isRevealed: (r, key) => revealOk(v, r, `${from.id}:${key}`) });
+        const red = redact(from.body, { hideDm: v.player, isRevealed: (r, key) => revealOk(v, r, `${from.id}:${key}`) });
         const names = this.computeLinkNames(from, red, (k, raw) => resolveField(raw, undefined, v, `${from.id}.${k}`).hidden);
         if (!names.some((l) => this.resolve(l.name, l.type)?.id === target.id)) continue;
       }
@@ -424,7 +425,7 @@ export class WorldRepo {
   // ---------- search ----------
   /** Spoiler-filtered text with links flattened to display text (hidden targets masked per hideTitles). */
   private readerText(p: Page, v: Viewer): string {
-    const red = redact(p.body, { isRevealed: (r, k) => revealOk(v, r, `${p.id}:${k}`) });
+    const red = redact(p.body, { hideDm: v.player, isRevealed: (r, k) => revealOk(v, r, `${p.id}:${k}`) });
     const res = this.resolverFor(v);
     let out = '';
     let pos = 0;

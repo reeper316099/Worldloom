@@ -1,0 +1,81 @@
+{
+  "relations": [
+    {
+      "continuityIds": [
+        "wn"
+      ],
+      "fromId": "st_character_kael-marrow",
+      "id": "r1",
+      "kind": "family",
+      "label": "sister",
+      "toId": "st_character_mira-ashgrove"
+    },
+    {
+      "continuityIds": [
+        "adapt"
+      ],
+      "fromId": "st_character_kael-marrow",
+      "id": "r2",
+      "kind": "ally",
+      "label": "childhood friend",
+      "toId": "st_character_mira-ashgrove"
+    },
+    {
+      "fromId": "st_character_orrin-vale",
+      "id": "r3",
+      "kind": "master_student",
+      "toId": "st_character_kael-marrow"
+    },
+    {
+      "fromId": "st_character_kael-marrow",
+      "id": "r4",
+      "kind": "rival",
+      "toId": "st_character_ilex-thorne"
+    },
+    {
+      "fromId": "st_character_kael-marrow",
+      "id": "r5",
+      "kind": "subordinate",
+      "toId": "st_character_dovan-reth"
+    },
+    {
+      "fromId": "st_character_sable",
+      "id": "r6",
+      "kind": "enemy",
+      "label": "bound",
+      "reveal": {
+        "at": 210,
+        "sourceId": "wn"
+      },
+      "toId": "st_character_kael-marrow"
+    },
+    {
+      "fromId": "st_character_ilex-thorne",
+      "id": "r7",
+      "kind": "family",
+      "label": "mother",
+      "toId": "st_character_lady-corvane"
+    },
+    {
+      "fromId": "st_character_lady-corvane",
+      "id": "r8",
+      "kind": "ally",
+      "label": "patron",
+      "reveal": {
+        "at": 190,
+        "sourceId": "wn"
+      },
+      "toId": "st_character_sable"
+    },
+    {
+      "fromId": "st_character_dovan-reth",
+      "id": "r9",
+      "kind": "enemy",
+      "timeSpan": {
+        "toArcId": "a4"
+      },
+      "toId": "st_character_lady-corvane"
+    }
+  ],
+  "schemaVersion": 1
+}

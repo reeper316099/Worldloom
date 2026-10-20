@@ -24,6 +24,8 @@ export interface LinkResolution {
 export interface RenderOptions {
   resolveLink?: (l: WikiLink) => LinkResolution;
   resolveCitation?: (text: string) => { label: string; sourceId?: string } | undefined;
+  /** Player view: drop `:::dm` blocks. */
+  hideDm?: boolean;
   /** Selected continuity id; blocks not applying to it are dropped. Undefined = show all with labels. */
   continuity?: string;
   /** Spoiler gate. Hidden content is REMOVED from output (never merely CSS-hidden). */
@@ -191,6 +193,12 @@ function transformChildren(parent: Parent, v: Visit, hidden: { v: boolean }): vo
         next.push(wrap('div', { className: ['spoiler'], dataKey: key }, child.children as Content[]));
         continue;
       }
+      if (child.name === 'dm') {
+        if (v.o.hideDm) continue;
+        transformChildren(child as unknown as Parent, v, hidden);
+        next.push(wrap('div', { className: ['dm-only'] }, child.children as Content[]));
+        continue;
+      }
       if (child.name === 'continuity') {
         const ids = (attrs.ids ?? '').split(',').map((s) => s.trim()).filter(Boolean);
         if (v.o.continuity && ids.length && !ids.includes(v.o.continuity)) continue;
@@ -276,7 +284,7 @@ export function render(source: string, o: RenderOptions = {}): RenderResult {
  * Source with withheld blocks removed (spoiler/continuity), for link/search indexing in reader mode.
  * Uses the same visibility rules as `render`.
  */
-export function redact(source: string, o: Pick<RenderOptions, 'continuity' | 'isRevealed'>): string {
+export function redact(source: string, o: Pick<RenderOptions, 'continuity' | 'isRevealed' | 'hideDm'>): string {
   const tree = parser.parse(source) as Root;
   const ranges: Array<[number, number]> = [];
   let b = 0;
@@ -288,6 +296,8 @@ export function redact(source: string, o: Pick<RenderOptions, 'continuity' | 'is
         const reveal = revealFromAttrs(attrs);
         const key = `spoiler:${b++}`;
         hide = !!reveal && !!o.isRevealed && !o.isRevealed(reveal, key);
+      } else if (n.name === 'dm') {
+        hide = !!o.hideDm;
       } else if (n.name === 'continuity' && o.continuity) {
         const ids = (attrs.ids ?? '').split(',').map((s) => s.trim()).filter(Boolean);
         hide = ids.length > 0 && !ids.includes(o.continuity);
