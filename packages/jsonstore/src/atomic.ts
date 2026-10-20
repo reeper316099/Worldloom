@@ -15,6 +15,19 @@ export function withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
   return next;
 }
 
+const BUSY = new Set(['EPERM', 'EBUSY', 'EACCES']);
+/** Windows briefly locks files that watchers/antivirus/indexers hold open: retry instead of failing. */
+export async function retryBusy<T>(fn: () => Promise<T>, tries = 8): Promise<T> {
+  for (let i = 0; ; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      if (i >= tries || !BUSY.has((e as NodeJS.ErrnoException).code ?? '')) throw e;
+      await new Promise((r) => setTimeout(r, 15 * (i + 1)));
+    }
+  }
+}
+
 let counter = 0;
 
 /** Atomic write: tmp file in same dir -> fsync -> rename. */
@@ -30,7 +43,7 @@ export async function atomicWrite(file: string, data: string | Uint8Array): Prom
     await fh.close();
   }
   try {
-    await fs.rename(tmp, file);
+    await retryBusy(() => fs.rename(tmp, file));
   } catch (e) {
     await fs.rm(tmp, { force: true });
     throw e;

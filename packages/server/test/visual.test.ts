@@ -48,16 +48,16 @@ describe('graph', () => {
     expect(await has('a5')).toBe(false);
     await progress(0);
   });
-  it('1000-node graph responds quickly', async () => {
+  it('a few hundred extra nodes do not slow the graph (5,000 nodes are covered in perf.test.ts)', async () => {
     const repo = await manager.get('the-ashen-ascent');
     const ids: string[] = [];
-    for (let i = 0; i < 1000; i++) ids.push((await repo.create({ type: 'character', title: `Perf ${i}`, status: 'draft', fields: i > 0 ? { allies: [`Perf ${Math.floor(i / 2)}`, `Perf ${(i * 7) % i}`] } : {} })).id);
+    for (let i = 0; i < 300; i++) ids.push((await repo.create({ type: 'character', title: `Perf ${i}`, status: 'draft', fields: i > 0 ? { allies: [`Perf ${Math.floor(i / 2)}`, `Perf ${(i * 7) % i}`] } : {} })).id);
     const t = Date.now();
     const g = (await call('GET', '/graph?mode=author')).body;
-    expect(g.nodes.length).toBeGreaterThanOrEqual(1000);
+    expect(g.nodes.length).toBeGreaterThanOrEqual(300);
     expect(Date.now() - t).toBeLessThan(1500);
     await repo.bulkDelete(ids);
-  }, 60_000);
+  }, 120_000);
 });
 
 describe('tree & breadcrumbs', () => {

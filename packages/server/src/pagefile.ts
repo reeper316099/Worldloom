@@ -14,6 +14,7 @@ export class PageFileError extends Error {
 
 /** Parse a page .md file (YAML frontmatter + Markdown body). */
 export function parsePageFile(text: string): Page {
+  text = text.replace(/\r\n/g, '\n'); // files checked out with CRLF (Windows autocrlf) behave like LF
   const m = FM.exec(text);
   if (!m) throw new PageFileError('missing frontmatter', 1);
   let raw: unknown;

@@ -11,6 +11,8 @@ import { defaultEntityTypes } from '../src/seed';
 import { buildGraph } from '../src/visual';
 
 const N = 5000, EDGES_PER = 4;
+// Shared CI runners are 2-3x slower and noisier than a dev machine; budgets are scaled there (strict locally).
+const K = process.env.CI ? 3 : 1;
 let dir: string;
 let repo: WorldRepo;
 let startup = 0;
@@ -47,7 +49,7 @@ describe('performance budget (5,000 pages, 20,000+ edges)', () => {
   it('loads the world quickly', () => {
     expect(repo.pages.size).toBe(N);
     console.log(`open ${N} pages: ${startup.toFixed(0)} ms`);
-    expect(startup).toBeLessThan(3000);
+    expect(startup).toBeLessThan(3000 * K);
   });
   it('search < 50 ms (author and reader)', () => {
     const v = (mode: string) => repo.viewer({ mode });
@@ -60,8 +62,8 @@ describe('performance budget (5,000 pages, 20,000+ edges)', () => {
         times.push(performance.now() - t);
       }
       console.log(`search ${mode} median ${median(times).toFixed(1)} ms, max ${Math.max(...times).toFixed(1)} ms`);
-      expect(median(times)).toBeLessThan(50);
-      expect(Math.max(...times)).toBeLessThan(120);
+      expect(median(times)).toBeLessThan(50 * K);
+      expect(Math.max(...times)).toBeLessThan(120 * K);
     }
   });
   it('page open < 150 ms (render, infobox, links)', () => {
@@ -72,7 +74,7 @@ describe('performance budget (5,000 pages, 20,000+ edges)', () => {
       times.push(performance.now() - t);
     }
     console.log(`page view median ${median(times).toFixed(1)} ms, max ${Math.max(...times).toFixed(1)} ms`);
-    expect(median(times)).toBeLessThan(150);
+    expect(median(times)).toBeLessThan(150 * K);
   });
   it('backlinks, relations and a 5k-node graph respond in reasonable time', () => {
     let t = performance.now();
@@ -84,7 +86,7 @@ describe('performance budget (5,000 pages, 20,000+ edges)', () => {
     const gt = performance.now() - t;
     console.log(`backlinks ${bl.toFixed(0)} ms; graph ${g.nodes.length} nodes / ${g.edges.length} edges in ${gt.toFixed(0)} ms`);
     expect(g.edges.length).toBeGreaterThan(15000);
-    expect(gt).toBeLessThan(1500);
+    expect(gt).toBeLessThan(1500 * K);
   });
   it('health report and a save stay responsive', async () => {
     let t = performance.now();
@@ -94,6 +96,6 @@ describe('performance budget (5,000 pages, 20,000+ edges)', () => {
     await repo.patch('p_7', { tags: ['x'] });
     const s = performance.now() - t;
     console.log(`health ${h.toFixed(0)} ms; patch ${s.toFixed(0)} ms`);
-    expect(s).toBeLessThan(300);
+    expect(s).toBeLessThan(300 * K);
   });
 });

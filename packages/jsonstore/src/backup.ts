@@ -1,19 +1,21 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
-import { atomicWrite } from './atomic';
+import { atomicWrite, retryBusy } from './atomic';
 
 /** Small per-file rolling snapshots (plain copies) used for corruption recovery. */
+let snapSeq = 0;
+
 export async function snapshotFile(file: string, dir: string, keep = 5): Promise<void> {
   let text: string;
   try {
-    text = await fs.readFile(file, 'utf8');
+    text = await retryBusy(() => fs.readFile(file, 'utf8'));
   } catch {
     return;
   }
   const base = path.basename(file);
   await fs.mkdir(dir, { recursive: true });
-  await atomicWrite(path.join(dir, `${base}.${Date.now()}.bak`), text);
+  await atomicWrite(path.join(dir, `${base}.${Date.now()}-${String(snapSeq++).padStart(6, '0')}.bak`), text);
   const all = (await fs.readdir(dir)).filter((f) => f.startsWith(base + '.') && f.endsWith('.bak')).sort();
   for (const old of all.slice(0, Math.max(0, all.length - keep))) await fs.rm(path.join(dir, old), { force: true });
 }

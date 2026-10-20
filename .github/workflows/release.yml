@@ -16,7 +16,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run dist -w @worldloom/desktop
+      - run: npm run dist -w @worldloom/desktop -- --publish never
         env:
           # optional signing: set these repository secrets to sign/notarize (see README)
           CSC_LINK: ${{ secrets.CSC_LINK }}
