@@ -115,7 +115,7 @@ function inlineNodes(text: string, v: Visit): Content[] {
       }
       const link: WikiLink = { ...p, raw: m[0], start: m.index!, end: pos };
       const res = v.o.resolveLink?.(link) ?? { href: '#', exists: true };
-      const shown = res.hidden ? '???' : (link.label ?? res.title ?? (link.name || link.section || ''));
+      const shown = res.hidden ? (res.title ?? '???') : (link.label ?? res.title ?? (link.name || link.section || ''));
       if (!res.hidden) v.r.links.push(link);
       const cls = ['wikilink', res.exists ? '' : 'redlink', res.hidden ? 'gated' : ''].filter(Boolean);
       out.push(wrap('a', { href: res.href, className: cls, dataTarget: res.hidden ? '' : link.name }, [{ type: 'text', value: shown }]));
