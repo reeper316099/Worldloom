@@ -55,11 +55,13 @@ export function PageScreen({ w, ref_ }: { w: string; ref_: string }) {
           {d.dmOnly && <span className="badge">DM only</span>}
           <span className="grow" />
           {mode === 'author' && <button className="btn ghost" onClick={() => setRenaming(true)}>Rename</button>}
+          {world && world.continuities.length > 1 && <a className="btn ghost" href={`#/w/${w}/p/${d.slug}/compare`}>⇄ Compare continuities</a>}
           <a className="btn" href={`#/w/${w}/p/${d.slug}/edit`}>✎ Edit</a>
         </div>
         <h1 className="title">{d.title}</h1>
         {d.aliases.length > 0 && <div className="muted">Also known as {d.aliases.join(', ')}</div>}
-        {world && continuityLabel(world, useApp.getState().continuity)}
+        {world && continuityLabel(world, continuity)}
+        {!d.appliesToSelected && <div className="callout warn" style={{ marginTop: 10 }}>This page is not part of the selected continuity; showing it for reference.</div>}
       </div>
       <div className="cols">
         <article className="prose" onClick={onProseClick} dangerouslySetInnerHTML={{ __html: d.html }} />
@@ -69,6 +71,11 @@ export function PageScreen({ w, ref_ }: { w: string; ref_: string }) {
             <div className="card"><h4>What links here</h4>
               {back.data?.length ? <ul>{back.data.map((b) => <li key={b.id}><a href={`#/w/${w}/p/${b.slug}`}>{b.title}</a></li>)}</ul> : <div className="muted">Nothing yet</div>}
             </div>
+            {d.claims.length > 0 && (
+              <div className="card claims"><h4>Claims</h4>
+                <ul>{d.claims.map((c, i) => <li key={i}><span className={`claim-dot ${c.kind}`} /><span><b>{c.kind}</b> {c.cited ? '' : <span className="warn" title="No citation inside this claim">unsourced · </span>}{c.text.slice(0, 80)}</span></li>)}</ul>
+              </div>
+            )}
             <div className="card"><h4>Categories & tags</h4>
               <div className="row" style={{ flexWrap: 'wrap' }}>{[...d.categories, ...d.tags.map((t) => '#' + t)].map((c) => <span className="pill" key={c}>{c}</span>)}</div>
             </div>

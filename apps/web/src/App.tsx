@@ -10,6 +10,8 @@ import { EditorScreen } from './screens/EditorScreen';
 import { NewPage } from './screens/NewPage';
 import { SearchScreen } from './screens/SearchScreen';
 import { TypesScreen } from './screens/TypesScreen';
+import { CanonScreen } from './screens/CanonScreen';
+import { CompareScreen } from './screens/CompareScreen';
 import { Palette } from './components/Palette';
 import { Toasts, Help } from './components/Overlays';
 
@@ -70,21 +72,24 @@ function useHotkeys(slug?: string) {
 
 export function App() {
   const route = useRoute();
-  const { mode, toggleMode, setTheme, theme, focus } = useApp();
+  const { mode, toggleMode, setTheme, theme, focus, continuity } = useApp();
   const qc = useQueryClient();
   const slug = route.path[0] === 'w' ? route.path[1] : undefined;
   useTheme();
   useWorldTheme(slug);
   useHotkeys(slug);
   useLiveEvents();
+  useEffect(() => { useApp.getState().setContinuity(undefined); }, [slug]);
   const { data: world } = useWorld(slug ?? '');
 
   let screen;
   const [, , kind, ref, extra] = route.path;
   if (!slug) screen = <Home />;
+  else if (kind === 'p' && ref && extra === 'compare') screen = <CompareScreen w={slug} ref_={ref} />;
   else if (kind === 'p' && ref && extra === 'edit') screen = <EditorScreen w={slug} ref_={ref} />;
   else if (kind === 'p' && ref) screen = <PageScreen w={slug} ref_={ref} />;
   else if (kind === 'new') screen = <NewPage w={slug} title={route.query.get('title') ?? ''} />;
+  else if (kind === 'canon') screen = <CanonScreen w={slug} />;
   else if (kind === 'types') screen = <TypesScreen w={slug} />;
   else if (kind === 'search') screen = <SearchScreen w={slug} text={route.query.get('q') ?? ''} />;
   else screen = <Dashboard w={slug} />;
@@ -101,11 +106,12 @@ export function App() {
         )}
         <span className="grow" />
         {slug && world && world.continuities.length > 1 && (
-          <select aria-label="Continuity" style={{ width: 'auto' }} value={useApp.getState().continuity ?? ''} onChange={(e) => useApp.getState().setContinuity(e.target.value || undefined)}>
+          <select aria-label="Continuity" style={{ width: 'auto' }} value={continuity ?? ''} onChange={(e) => useApp.getState().setContinuity(e.target.value || undefined)}>
             <option value="">All continuities</option>
             {world.continuities.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         )}
+        {slug && <a className="btn ghost" href={`#/w/${slug}/canon`}>Canon</a>}
         {slug && <a className="btn ghost" href={`#/w/${slug}/types`}>Types</a>}
         <button className="btn ghost" onClick={() => useApp.getState().openPalette('command')} aria-label="Open command palette">⌘K</button>
         <button className={`pill ${mode}`} title="Toggle spoiler mode (Ctrl/Cmd+Shift+S)" onClick={() => { toggleMode(); void qc.invalidateQueries(); }}>

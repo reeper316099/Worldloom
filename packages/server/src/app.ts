@@ -146,9 +146,7 @@ export async function buildApp({ token, manager, log }: AppOptions): Promise<Fas
       const items = parse(z.array(schema), req.body);
       const ids = items.map((i) => i.id);
       if (new Set(ids).size !== ids.length) throw badRequest('duplicate ids');
-      const w = await (await repo(req)).updateWorld((w) => {
-        (w[key] as unknown[]) = items;
-      });
+      const w = await (await repo(req)).setCanon(key, items as never);
       return w[key];
     });
   }
@@ -200,6 +198,11 @@ export async function buildApp({ token, manager, log }: AppOptions): Promise<Fas
     const rp = await repo(req);
     const q = parse(ModeQ, req.query);
     return rp.view((req.params as { ref: string }).ref, viewerOf(rp, q), q.cont);
+  });
+  app.get(`${W}/pages/:ref/compare`, async (req) => {
+    const rp = await repo(req);
+    const q = parse(ModeQ.extend({ a: z.string(), b: z.string() }), req.query);
+    return rp.compare((req.params as { ref: string }).ref, viewerOf(rp, q), q.a, q.b);
   });
   app.get(`${W}/pages/:ref/raw`, async (req) => {
     const rp = await repo(req);

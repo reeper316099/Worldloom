@@ -350,6 +350,7 @@ export class WorldRepo {
       hidden: false as const,
       id: p.id, title: p.title, slug: p.slug, type: p.type, typeName: t?.name ?? p.type, status: p.status,
       aliases: p.aliases, tags: p.tags, categories: this.categoriesOf(p), appliesTo: p.appliesTo,
+      appliesToSelected: continuity === undefined || p.appliesTo === 'all' || p.appliesTo.includes(continuity),
       redirectsTo: p.redirectsTo, dmOnly: p.dmOnly, reveal: v.mode === 'author' ? p.reveal : undefined,
       html: r.html, headings: r.headings, infobox, claims: r.claims, hiddenBlocks: v.mode === 'author' ? [] : r.hiddenBlocks.length,
       createdAt: p.createdAt, updatedAt: p.updatedAt,
@@ -677,6 +678,74 @@ export class WorldRepo {
     this.events.emit('event', { type: 'world-changed' });
     return this.world;
   }
+  /** Pages/config that still reference a continuity, source or arc id. */
+  references(kind: 'continuity' | 'source' | 'arc', id: string): string[] {
+    const out: string[] = [];
+    const esc = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const bodyRe = kind === 'continuity' ? new RegExp(`ids="(?:[^"]*,)?\\s*${esc}\\s*(?:,[^"]*)?"`) : new RegExp(`${kind === 'source' ? 'src' : 'arc'}="${esc}"`);
+    const keyRe = kind === 'source' ? `"sourceId":"${id}"` : kind === 'arc' ? `"arcId":"${id}"` : `"${id}":`;
+    for (const p of this.pages.values()) {
+      const hit =
+        (kind === 'continuity' && p.appliesTo !== 'all' && p.appliesTo.includes(id)) ||
+        bodyRe.test(p.body) ||
+        (kind !== 'continuity' && JSON.stringify([p.reveal, p.fields]).includes(keyRe)) ||
+        (kind === 'continuity' && JSON.stringify(p.fields).includes(`"byContinuity":{`) && JSON.stringify(p.fields).includes(keyRe));
+      if (hit) out.push(p.title);
+    }
+    return out;
+  }
+
+  /** Replace continuities / sources / arcs with integrity checks (no dangling references). */
+  async setCanon(key: 'continuities' | 'sources' | 'arcs', items: World[typeof key]) {
+    const w = this.world;
+    const next = { continuities: w.continuities, sources: w.sources, arcs: w.arcs, [key]: items } as Pick<World, 'continuities' | 'sources' | 'arcs'>;
+    if (!next.continuities.length) throw badRequest('at least one continuity is required');
+    const primaries = next.continuities.filter((c) => c.isPrimary).length;
+    if (primaries > 1) throw badRequest('only one continuity can be primary');
+    if (primaries === 0) next.continuities = next.continuities.map((c, i) => ({ ...c, isPrimary: i === 0 }));
+    const cIds = new Set(next.continuities.map((c) => c.id));
+    for (const s of next.sources) if (!cIds.has(s.continuityId)) throw key === 'continuities' ? conflict(`continuity "${s.continuityId}" still has sources (e.g. "${s.name}")`) : badRequest(`source "${s.name}" uses unknown continuity "${s.continuityId}"`);
+    const sIds = new Set(next.sources.map((s) => s.id));
+    for (const a of next.arcs) for (const [sid, r] of Object.entries(a.ranges)) {
+      if (!sIds.has(sid)) {
+        if (key === 'sources') delete a.ranges[sid]; // cascade: a removed source drops its arc ranges
+        else throw badRequest(`arc "${a.name}" has a range for unknown source "${sid}"`);
+      } else if (r.from > r.to) throw badRequest(`arc "${a.name}": range start is after its end`);
+    }
+    const old = { continuities: w.continuities, sources: w.sources, arcs: w.arcs }[key];
+    const removed = old.filter((o) => !items.some((n) => n.id === o.id)).map((o) => o.id);
+    const kind = key === 'continuities' ? 'continuity' : key === 'sources' ? 'source' : 'arc';
+    for (const id of removed) {
+      const refs = this.references(kind, id);
+      if (key === 'continuities' && w.sources.some((s) => s.continuityId === id)) throw conflict(`continuity "${id}" still has sources`);
+      if (key === 'arcs' && w.tierSystems.some((t) => JSON.stringify(t.reveal ?? '').includes(`"${id}"`))) throw conflict(`arc "${id}" gates a tier system`);
+      if (refs.length) throw conflict(`"${id}" is still referenced by ${refs.length} page(s): ${refs.slice(0, 5).join(', ')}${refs.length > 5 ? '…' : ''}`);
+    }
+    return this.updateWorld((x) => {
+      x.continuities = next.continuities;
+      x.sources = next.sources;
+      x.arcs = next.arcs;
+      for (const id of removed) {
+        if (key === 'sources') delete x.progress.sources[id];
+        if (key === 'arcs' && x.progress.arcCheckpoint === id) delete x.progress.arcCheckpoint;
+      }
+    });
+  }
+
+  /** Side-by-side view of one page in two continuities, with an infobox diff. */
+  compare(ref: string, v: Viewer, a: string, b: string) {
+    const va = this.view(ref, v, a);
+    const vb = this.view(ref, v, b);
+    if (va.hidden || vb.hidden) return { a: va, b: vb, infobox: [] as Array<{ key: string; label: string; a: unknown; b: unknown; differs: boolean }> };
+    const keys = [...new Set([...va.infobox.rows.map((r) => r.key), ...vb.infobox.rows.map((r) => r.key)])];
+    const infobox = keys.map((key) => {
+      const ra = va.infobox.rows.find((r) => r.key === key);
+      const rb = vb.infobox.rows.find((r) => r.key === key);
+      return { key, label: (ra ?? rb)!.label, a: ra?.value, b: rb?.value, differs: JSON.stringify(ra?.value) !== JSON.stringify(rb?.value) };
+    });
+    return { a: va, b: vb, infobox };
+  }
+
   async setTypes(types: EntityType[]) {
     const parsed = EntityTypesFileSchema.parse({ schemaVersion: 1, types });
     await this.typesFile.save(parsed);

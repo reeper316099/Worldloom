@@ -41,9 +41,9 @@ export interface ListItem { id: string; title: string; slug: string; type?: stri
 export interface InfoRow { key: string; label: string; type: string; value: unknown; hidden?: boolean }
 export interface PageView {
   hidden: false; id: string; title: string; slug: string; type: string; typeName: string; status: string; aliases: string[]; tags: string[];
-  categories: string[]; html: string; headings: Array<{ depth: number; text: string; id: string }>; infobox: { rows: InfoRow[] };
+  categories: string[]; appliesToSelected: boolean; html: string; headings: Array<{ depth: number; text: string; id: string }>; infobox: { rows: InfoRow[] };
   claims: Array<{ kind: string; text: string; cited: boolean }>; updatedAt: string; dmOnly: boolean;
 }
 export interface PageHidden { hidden: true; id: string; title: string; message: string }
-export interface RawPage { id: string; type: string; title: string; slug: string; aliases: string[]; status: string; tags: string[]; fields: Record<string, unknown>; body: string }
+export interface RawPage { id: string; type: string; title: string; slug: string; aliases: string[]; status: string; tags: string[]; fields: Record<string, unknown>; appliesTo: 'all' | string[]; body: string }
 export interface Hit { id: string; title: string; slug: string; type: string; snippet?: string; alias?: string }

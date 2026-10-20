@@ -124,7 +124,7 @@ function inlineNodes(text: string, v: Visit): Content[] {
     } else if (m[2] === 'src') {
       const c = v.o.resolveCitation?.(m[3]!) ?? { label: m[3]! };
       v.r.citations.push(m[3]!);
-      out.push(wrap('span', { className: ['cite'], dataSource: c.sourceId ?? '' }, [{ type: 'text', value: c.label }]));
+      out.push(wrap('span', { className: ['cite'], dataSource: c.sourceId ?? '', title: m[3]! }, [{ type: 'text', value: c.label }]));
     } else if (m[2] === 'claim') {
       const kind = m[3]!.trim().toLowerCase();
       if (CLAIM_KINDS.has(kind)) out.push({ type: 'text', value: '', marker: { open: kind as ClaimKind } } as Marker);

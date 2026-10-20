@@ -97,3 +97,8 @@ mark.claim-confirmed { border-color: var(--success); } mark.claim-inferred { bor
 label.f { display: grid; gap: 4px; font-size: .8rem; color: var(--text-muted); }
 .help dt { font-family: var(--mono); background: var(--surface-2); padding: 1px 6px; border-radius: 4px; display: inline-block; } .help dd { margin: 0 0 6px 8px; display: inline; }
 .focus .topbar, .focus .editor .form, .focus .editor .prev { display: none; } .focus .editor { grid-template-columns: 1fr; }
+.compare-cols { display: grid; gap: var(--space-4); grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; } @media (max-width: 900px) { .compare-cols { grid-template-columns: 1fr; } }
+table.cmp { width: 100%; border-collapse: collapse; } table.cmp td, table.cmp th { padding: 8px 10px; border-top: 1px solid var(--border); text-align: left; vertical-align: top; }
+table.cmp tr.differs td { background: color-mix(in srgb, var(--warning) 12%, transparent); } table.cmp tr.differs td:nth-child(n+2) { font-weight: 600; }
+.claims li { display: flex; gap: 6px; align-items: baseline; font-size: .85rem; } .claim-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--text-muted); } .claim-dot.confirmed { background: var(--success); } .claim-dot.inferred { background: var(--warning); } .claim-dot.theory { background: var(--accent); } .claim-dot.retconned { background: var(--danger); }
+.warn { color: var(--warning); }
