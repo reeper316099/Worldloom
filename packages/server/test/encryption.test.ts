@@ -150,11 +150,13 @@ describe('encrypted worlds', () => {
 
   it('auto-locks after idle time', async () => {
     await app.close(); await manager.close();
-    manager = await new WorldManager(data, { revisionDebounceMs: 0 }, undefined, { autoLockMs: 400 }).init();
+    // generous window: a slow CI runner can stall for hundreds of ms between unlock and the first read
+    manager = await new WorldManager(data, { revisionDebounceMs: 0 }, undefined, { autoLockMs: 2500 }).init();
     app = await buildApp({ token: 't', manager });
-    await call('POST', '/worlds/vault/unlock', { passphrase: 'a new passphrase' });
+    const unlock = await call('POST', '/worlds/vault/unlock', { passphrase: 'a new passphrase' });
+    expect(unlock.status, `unlock: ${JSON.stringify(unlock.body)}`).toBe(200);
     expect((await call('GET', '/worlds/vault/pages')).status).toBe(200);
-    await new Promise((r) => setTimeout(r, 1200));
+    await new Promise((r) => setTimeout(r, 4500));
     expect((await call('GET', '/worlds/vault/pages')).status).toBe(423);
   });
 
