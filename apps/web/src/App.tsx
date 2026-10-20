@@ -1,0 +1,121 @@
+import { useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useApp } from './store';
+import { go, useRoute } from './router';
+import { useLiveEvents, useWorld } from './hooks';
+import { Home } from './screens/Home';
+import { Dashboard } from './screens/Dashboard';
+import { PageScreen } from './screens/PageScreen';
+import { EditorScreen } from './screens/EditorScreen';
+import { NewPage } from './screens/NewPage';
+import { SearchScreen } from './screens/SearchScreen';
+import { Palette } from './components/Palette';
+import { Toasts, Help } from './components/Overlays';
+
+function useTheme() {
+  const theme = useApp((s) => s.theme);
+  const density = useApp((s) => s.density);
+  useEffect(() => {
+    const mq = matchMedia('(prefers-color-scheme: dark)');
+    const apply = () => (document.documentElement.dataset.theme = theme === 'system' ? (mq.matches ? 'dark' : 'light') : theme);
+    apply();
+    mq.addEventListener('change', apply);
+    return () => mq.removeEventListener('change', apply);
+  }, [theme]);
+  useEffect(() => { document.documentElement.dataset.density = density; }, [density]);
+}
+
+/** Per-world theming: accent overrides --primary and reading font. */
+function useWorldTheme(slug?: string) {
+  const { data } = useWorld(slug ?? '');
+  useEffect(() => {
+    const st = document.documentElement.style;
+    if (slug && data) {
+      st.setProperty('--primary', data.accent);
+      document.documentElement.dataset.read = data.theme.readingFont;
+    } else {
+      st.removeProperty('--primary');
+      delete document.documentElement.dataset.read;
+    }
+  }, [slug, data]);
+}
+
+function useHotkeys(slug?: string) {
+  const s = useApp();
+  const qc = useQueryClient();
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey;
+      const t = e.target as HTMLElement;
+      const typing = t.matches('input, textarea, select') || t.closest('.cm-editor');
+      const k = e.key.toLowerCase();
+      if (mod && k === 'k') { e.preventDefault(); s.openPalette('command'); }
+      else if (mod && k === 'p' && slug) { e.preventDefault(); s.openPalette('open'); }
+      else if (mod && e.shiftKey && k === 's') { e.preventDefault(); s.toggleMode(); void qc.invalidateQueries(); }
+      else if (mod && k === 'e' && slug) {
+        e.preventDefault();
+        const h = location.hash;
+        if (/\/edit$/.test(h)) go(h.replace(/\/edit$/, ''));
+        else if (/\/p\/[^/]+$/.test(h)) go(h + '/edit');
+      } else if (!typing && e.key === '?') s.setHelp(true);
+      else if (!typing && e.key === '[') history.back();
+      else if (!typing && e.key === ']') history.forward();
+      else if (e.key === 'Escape') { s.openPalette(null); s.setHelp(false); }
+    };
+    addEventListener('keydown', onKey);
+    return () => removeEventListener('keydown', onKey);
+  }, [s, qc, slug]);
+}
+
+export function App() {
+  const route = useRoute();
+  const { mode, toggleMode, setTheme, theme, focus } = useApp();
+  const qc = useQueryClient();
+  const slug = route.path[0] === 'w' ? route.path[1] : undefined;
+  useTheme();
+  useWorldTheme(slug);
+  useHotkeys(slug);
+  useLiveEvents();
+  const { data: world } = useWorld(slug ?? '');
+
+  let screen;
+  const [, , kind, ref, extra] = route.path;
+  if (!slug) screen = <Home />;
+  else if (kind === 'p' && ref && extra === 'edit') screen = <EditorScreen w={slug} ref_={ref} />;
+  else if (kind === 'p' && ref) screen = <PageScreen w={slug} ref_={ref} />;
+  else if (kind === 'new') screen = <NewPage w={slug} title={route.query.get('title') ?? ''} />;
+  else if (kind === 'search') screen = <SearchScreen w={slug} text={route.query.get('q') ?? ''} />;
+  else screen = <Dashboard w={slug} />;
+
+  return (
+    <div className={`shell ${focus ? 'focus' : ''}`}>
+      <header className="topbar">
+        <a className="brand" href="#/">Worldloom</a>
+        {slug && (
+          <nav className="crumbs">
+            <span>/</span>
+            <a href={`#/w/${slug}`}>{world?.name ?? slug}</a>
+          </nav>
+        )}
+        <span className="grow" />
+        {slug && world && world.continuities.length > 1 && (
+          <select aria-label="Continuity" style={{ width: 'auto' }} value={useApp.getState().continuity ?? ''} onChange={(e) => useApp.getState().setContinuity(e.target.value || undefined)}>
+            <option value="">All continuities</option>
+            {world.continuities.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        )}
+        <button className="btn ghost" onClick={() => useApp.getState().openPalette('command')} aria-label="Open command palette">⌘K</button>
+        <button className={`pill ${mode}`} title="Toggle spoiler mode (Ctrl/Cmd+Shift+S)" onClick={() => { toggleMode(); void qc.invalidateQueries(); }}>
+          {mode === 'author' ? '✎ Author mode' : '👁 Reader mode'}
+        </button>
+        <button className="btn ghost" aria-label="Toggle theme" onClick={() => setTheme(theme === 'dark' ? 'light' : theme === 'light' ? 'system' : 'dark')}>
+          {theme === 'dark' ? '🌙' : theme === 'light' ? '☀️' : '🖥'}
+        </button>
+      </header>
+      <main className="main"><div className="wrap">{screen}</div></main>
+      <Palette slug={slug} />
+      <Help />
+      <Toasts />
+    </div>
+  );
+}

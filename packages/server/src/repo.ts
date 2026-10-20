@@ -341,7 +341,8 @@ export class WorldRepo {
     if (!pageVisible(v, p)) {
       return { id: p.id, hidden: true as const, title: this.stubTitle(v, p), message: "You haven't reached this yet", slug: v.hideTitles ? p.id : p.slug };
     }
-    const r = render(p.body, this.renderOpts(v, p, continuity));
+    // the UI shows the infobox as a sticky card, so the inline {{infobox}} marker renders empty here
+    const r = render(p.body, { ...this.renderOpts(v, p, continuity), infobox: () => '' });
     const t = this.typeOf(p);
     const infobox: Infobox = buildInfobox(p, t, v, continuity);
     return {
@@ -352,6 +353,15 @@ export class WorldRepo {
       html: r.html, headings: r.headings, infobox, claims: r.claims, hiddenBlocks: v.mode === 'author' ? [] : r.hiddenBlocks.length,
       createdAt: p.createdAt, updatedAt: p.updatedAt,
     };
+  }
+  /** Live preview of unsaved Markdown (author view) for the editor. */
+  preview(body: string, pageId?: string, continuity?: string) {
+    const base = pageId ? this.pages.get(pageId) : undefined;
+    const now = new Date().toISOString();
+    const p: Page = { ...(base ?? { id: 'preview', type: 'concept', title: 'Preview', slug: 'preview', aliases: [], status: 'draft', tags: [], categories: [], fields: {}, appliesTo: 'all', dmOnly: false, createdAt: now, updatedAt: now }), body };
+    const v = this.viewer({ mode: 'author' });
+    const r = render(body, { ...this.renderOpts(v, p, continuity), infobox: () => '' });
+    return { html: r.html, headings: r.headings, claims: r.claims };
   }
   categoriesOf(p: Page) {
     const t = this.typeOf(p);

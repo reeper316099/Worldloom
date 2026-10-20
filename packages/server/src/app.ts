@@ -191,6 +191,11 @@ export async function buildApp({ token, manager, log }: AppOptions): Promise<Fas
   });
   app.post(`${W}/tx/:id/undo`, async (req) => ({ restoredFiles: await (await repo(req)).undoTx((req.params as { id: string }).id) }));
 
+  app.post(`${W}/render`, async (req) => {
+    const b = parse(z.object({ body: z.string().max(2_000_000), pageId: z.string().optional(), continuity: z.string().optional() }), req.body);
+    return (await repo(req)).preview(b.body, b.pageId, b.continuity);
+  });
+
   // ----- search / links / categories -----
   app.get(`${W}/search`, async (req) => {
     const rp = await repo(req);
