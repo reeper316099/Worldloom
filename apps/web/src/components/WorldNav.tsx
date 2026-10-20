@@ -1,6 +1,6 @@
 import { useRoute } from '../router';
 
-const ITEMS: Array<[string, string]> = [['', 'Overview'], ['graph', 'Graph'], ['tree', 'Trees'], ['timeline', 'Timeline'], ['tiers', 'Tiers'], ['compare', 'Compare'], ['boards', 'Tier lists'], ['canon', 'Canon'], ['types', 'Types']];
+const ITEMS: Array<[string, string]> = [['', 'Overview'], ['graph', 'Graph'], ['tree', 'Trees'], ['timeline', 'Timeline'], ['tiers', 'Tiers'], ['compare', 'Compare'], ['boards', 'Tier lists'], ['canon', 'Canon'], ['types', 'Types'], ['data', 'Import / Export']];
 
 export function WorldNav({ slug }: { slug: string }) {
   const { path } = useRoute();

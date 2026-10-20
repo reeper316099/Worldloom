@@ -53,7 +53,7 @@ function PaletteInner({ kind, slug, close }: { kind: 'command' | 'open'; slug?: 
 
   return (
     <div className="overlay" onMouseDown={close}>
-      <div className="palette" role="dialog" aria-label={kind === 'open' ? 'Quick open' : 'Command palette'} onMouseDown={(e) => e.stopPropagation()}>
+      <div className="palette" role="dialog" aria-modal="true" aria-label={kind === 'open' ? 'Quick open' : 'Command palette'} onMouseDown={(e) => e.stopPropagation()}>
         <input ref={ref} value={text} placeholder={kind === 'open' ? 'Open page…' : 'Type a command or search… (type:character tag:x cont:wn)'} aria-label="Search"
           onChange={(e) => { setText(e.target.value); setSel(0); }}
           onKeyDown={(e) => {

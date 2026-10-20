@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { promises as fsp } from 'node:fs';
 import path from 'node:path';
 import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
 import { z, ZodError } from 'zod';
@@ -18,7 +19,12 @@ export interface AppOptions {
   token: string;
   manager: WorldManager;
   log?: (line: Record<string, unknown>) => void;
+  /** Directory with the built web UI; served same-origin with a strict CSP. */
+  staticDir?: string;
 }
+
+const MIME: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2', '.woff': 'font/woff', '.ico': 'image/x-icon', '.map': 'application/json' };
+export const APP_CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 
 const ModeQ = z.object({
   mode: z.enum(['reader', 'author']).default('reader'),
@@ -34,8 +40,8 @@ function parse<S extends z.ZodTypeAny>(schema: S, data: unknown): z.infer<S> {
 
 declare module 'fastify' { interface FastifyInstance { routeTable: Array<{ method: string; url: string }> } }
 
-export async function buildApp({ token, manager, log }: AppOptions): Promise<FastifyInstance> {
-  const app = Fastify({ logger: false, bodyLimit: 5 * 1024 * 1024, genReqId: () => crypto.randomBytes(6).toString('hex') });
+export async function buildApp({ token, manager, log, staticDir }: AppOptions): Promise<FastifyInstance> {
+  const app = Fastify({ logger: false, keepAliveTimeout: 120_000, connectionTimeout: 0, forceCloseConnections: true, bodyLimit: 5 * 1024 * 1024, genReqId: () => crypto.randomBytes(6).toString('hex') });
   const want = Buffer.from(token);
   const routeTable: Array<{ method: string; url: string }> = [];
   app.addHook('onRoute', (o) => { for (const m of [o.method].flat()) if (m !== 'HEAD' && m !== 'OPTIONS') routeTable.push({ method: m, url: o.url }); });
@@ -47,6 +53,7 @@ export async function buildApp({ token, manager, log }: AppOptions): Promise<Fas
     reply.header('X-Content-Type-Options', 'nosniff').header('Cache-Control', 'no-store').header('Referrer-Policy', 'no-referrer');
     const url = req.url.split('?')[0]!;
     if (url === '/healthz') return;
+    if (staticDir && !url.startsWith('/api/')) return; // the UI shell itself carries no data; every data route requires the token
     let got = req.headers.authorization?.replace(/^Bearer\s+/i, '');
     // EventSource and <img> cannot set headers; allow a query token only on those two GET routes.
     if (!got && req.method === 'GET' && /\/(events|assets\/[^/]+)$/.test(url)) got = (req.query as { access_token?: string }).access_token;
@@ -67,6 +74,21 @@ export async function buildApp({ token, manager, log }: AppOptions): Promise<Fas
   app.setNotFoundHandler((req, reply) => reply.status(404).send({ error: { code: 'not_found', message: 'route not found', requestId: req.id } }));
 
   app.get('/healthz', async () => ({ ok: true }));
+  if (staticDir) {
+    const root = path.resolve(staticDir);
+    app.get('/*', async (req, reply) => {
+      let rel = decodeURIComponent((req.params as { '*': string })['*'] || '');
+      if (!rel || rel.endsWith('/')) rel += 'index.html';
+      let file = path.resolve(root, rel);
+      if (file !== root && !file.startsWith(root + path.sep)) throw new ApiError(404, 'not_found', 'not found');
+      let data: Buffer;
+      try { data = await fsp.readFile(file); } catch { file = path.join(root, 'index.html'); data = await fsp.readFile(file).catch(() => { throw new ApiError(404, 'not_found', 'not found'); }); }
+      const ext = path.extname(file);
+      reply.header('Content-Type', MIME[ext] ?? 'application/octet-stream').header('Content-Security-Policy', APP_CSP).header('X-Frame-Options', 'DENY');
+      if (rel.startsWith('assets/')) reply.header('Cache-Control', 'public, max-age=31536000, immutable');
+      return reply.send(data);
+    });
+  }
 
   const r = `${API_PREFIX}`;
   const W = `${r}/worlds/:w`;

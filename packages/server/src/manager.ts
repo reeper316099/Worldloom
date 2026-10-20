@@ -69,20 +69,29 @@ export class WorldManager {
     }
     return out.sort();
   }
+  private opening = new Map<string, Promise<WorldRepo>>();
+  /** One repo per world, even when many requests arrive at once (the in-flight open is shared). */
   async get(slug: string): Promise<WorldRepo> {
     if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) throw notFound('world');
     const hit = this.repos.get(slug);
     if (hit) return hit;
-    const dir = path.join(this.worldsDir(), slug);
-    try {
-      await fs.access(path.join(dir, 'world.json'));
-    } catch {
-      throw notFound('world');
+    let p = this.opening.get(slug);
+    if (!p) {
+      p = (async () => {
+        const dir = path.join(this.worldsDir(), slug);
+        try {
+          await fs.access(path.join(dir, 'world.json'));
+        } catch {
+          throw notFound('world');
+        }
+        const repo = await new WorldRepo(dir, this.repoOpts).open();
+        repo.events.on('event', (e) => this.events.emit('event', { world: slug, ...e }));
+        this.repos.set(slug, repo);
+        return repo;
+      })().finally(() => this.opening.delete(slug));
+      this.opening.set(slug, p);
     }
-    const repo = await new WorldRepo(dir, this.repoOpts).open();
-    repo.events.on('event', (e) => this.events.emit('event', { world: slug, ...e }));
-    this.repos.set(slug, repo);
-    return repo;
+    return p;
   }
   async summaries() {
     const out = [];

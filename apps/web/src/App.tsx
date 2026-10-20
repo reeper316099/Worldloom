@@ -19,6 +19,8 @@ import { TiersScreen } from './screens/TiersScreen';
 import { CompareManyScreen } from './screens/CompareManyScreen';
 import { BoardsScreen } from './screens/BoardsScreen';
 import { WorldNav } from './components/WorldNav';
+import { DataScreen } from './screens/DataScreen';
+import { SettingsScreen } from './screens/SettingsScreen';
 import { Palette } from './components/Palette';
 import { Toasts, Help } from './components/Overlays';
 import { ProgressPanel } from './components/ProgressPanel';
@@ -73,7 +75,7 @@ function useHotkeys(slug?: string) {
       else if (!typing && slug && !mod && k === 't') go(`/w/${slug}/timeline`);
       else if (!typing && e.key === '[') history.back();
       else if (!typing && e.key === ']') history.forward();
-      else if (e.key === 'Escape') { s.openPalette(null); s.setHelp(false); }
+      else if (e.key === 'Escape') { s.openPalette(null); s.setHelp(false); s.setProgress(false); }
     };
     addEventListener('keydown', onKey);
     return () => removeEventListener('keydown', onKey);
@@ -86,7 +88,7 @@ function ProgressDialog({ slug }: { slug?: string }) {
   if (!open || !slug || !world) return null;
   return (
     <div className="overlay" onMouseDown={() => useApp.getState().setProgress(false)}>
-      <div className="dialog" role="dialog" aria-label="My progress" onMouseDown={(e) => e.stopPropagation()}>
+      <div className="dialog" role="dialog" aria-modal="true" aria-label="My progress" onMouseDown={(e) => e.stopPropagation()}>
         <ProgressPanel w={slug} world={world} />
         <div className="row"><span className="grow" /><button className="btn" onClick={() => useApp.getState().setProgress(false)}>Done</button></div>
       </div>
@@ -113,12 +115,19 @@ export function App() {
   useWorldTheme(slug);
   useHotkeys(slug);
   useLiveEvents();
+  // native menu actions from the Electron shell
+  useEffect(() => window.worldloomDesktop?.onMenu?.((a) => {
+    const st = useApp.getState();
+    if (a === 'home') go('/'); else if (a === 'settings') go('/settings'); else if (a === 'palette') st.openPalette('command'); else if (a === 'help') st.setHelp(true);
+    else if (a === 'toggle-spoiler') { st.toggleMode(); void qc.invalidateQueries(); }
+  }), [qc]);
   useEffect(() => { useApp.getState().setContinuity(undefined); }, [slug]);
   const { data: world } = useWorld(slug ?? '');
 
   let screen;
   const [, , kind, ref, extra] = route.path;
-  if (!slug) screen = <Home />;
+  if (route.path[0] === 'settings') screen = <SettingsScreen />;
+  else if (!slug) screen = <Home />;
   else if (kind === 'p' && ref && extra === 'compare') screen = <CompareScreen w={slug} ref_={ref} />;
   else if (kind === 'p' && ref && extra === 'edit') screen = <EditorScreen w={slug} ref_={ref} />;
   else if (kind === 'p' && ref) screen = <PageScreen w={slug} ref_={ref} />;
@@ -129,6 +138,7 @@ export function App() {
   else if (kind === 'tiers') screen = <TiersScreen w={slug} />;
   else if (kind === 'compare') screen = <CompareManyScreen w={slug} />;
   else if (kind === 'boards') screen = <BoardsScreen w={slug} id={ref} />;
+  else if (kind === 'data') screen = <DataScreen w={slug} />;
   else if (kind === 'canon') screen = <CanonScreen w={slug} />;
   else if (kind === 'types') screen = <TypesScreen w={slug} />;
   else if (kind === 'search') screen = <SearchScreen w={slug} text={route.query.get('q') ?? ''} />;
@@ -136,6 +146,7 @@ export function App() {
 
   return (
     <div className={`shell ${focus ? 'focus' : ''}`}>
+      <a className="skip" href="#main" onClick={(e) => { e.preventDefault(); document.getElementById('main')?.focus(); }}>Skip to content</a>
       <header className="topbar">
         <a className="brand" href="#/">Worldloom</a>
         {slug && (
@@ -152,6 +163,7 @@ export function App() {
           </select>
         )}
         {slug && <button className="btn ghost" onClick={() => useApp.getState().setProgress(true)}>Progress</button>}
+        <a className="btn ghost" href="#/settings" aria-label="Settings">⚙</a>
         <button className="btn ghost" onClick={() => useApp.getState().openPalette('command')} aria-label="Open command palette">⌘K</button>
         <button className={`pill ${mode}`} title="Toggle spoiler mode (Ctrl/Cmd+Shift+S)" onClick={() => { toggleMode(); void qc.invalidateQueries(); }}>
           {mode === 'author' ? '✎ Author mode' : '👁 Reader mode'}
@@ -161,7 +173,7 @@ export function App() {
         </button>
       </header>
       {slug ? <WorldNav slug={slug} /> : <div />}
-      <main className="main"><div className="wrap"><Boundary resetKey={location.hash}>{screen}</Boundary></div></main>
+      <main className="main" id="main" tabIndex={-1}><div className="wrap"><Boundary resetKey={location.hash}>{screen}</Boundary></div></main>
       <Palette slug={slug} />
       <Help />
       <ProgressDialog slug={slug} />

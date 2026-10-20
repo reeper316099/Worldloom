@@ -262,3 +262,16 @@ async function waitFor(fn: () => Promise<boolean>, ms = 5000) {
   }
   throw new Error('timeout waiting for condition');
 }
+
+describe('concurrency', () => {
+  it('opens a world once and answers a burst of simultaneous first requests', async () => {
+    const fresh = await new WorldManager(dir, { revisionDebounceMs: 0 }).init();
+    const app2 = await buildApp({ token: TOKEN, manager: fresh });
+    const rs = await Promise.all(Array.from({ length: 60 }, () => app2.inject({ method: 'GET', url: '/api/v1/worlds/tw/pages?mode=author', headers: H })));
+    expect(rs.map((r) => r.statusCode).filter((c) => c !== 200)).toEqual([]);
+    const repos = (fresh as unknown as { repos: Map<string, unknown> }).repos;
+    expect(repos.size).toBe(1);
+    await app2.close();
+    await fresh.close();
+  });
+});

@@ -54,6 +54,7 @@ export function CodeEditor(props: { apiRef?: React.MutableRefObject<{ wrap: (ope
         extensions: [
           vimC.current.of(props.vimMode ? vim() : []),
           spellC.current.of(EditorView.contentAttributes.of({ spellcheck: String(props.spell) })),
+          EditorView.contentAttributes.of({ 'aria-label': 'Page body (Markdown)', role: 'textbox', 'aria-multiline': 'true' }),
           lineNumbers(), history(), markdown(), EditorView.lineWrapping, placeholder('Write in Markdown. Type [[ to link, / for blocks.'),
           autocompletion({ override: [links, slash] }),
           keymap.of([...defaultKeymap, ...historyKeymap]),

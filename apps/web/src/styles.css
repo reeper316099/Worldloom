@@ -41,13 +41,13 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); outlin
 .btn.danger { color: var(--danger); }
 .muted { color: var(--text-muted); } .row { display: flex; gap: var(--space-3); align-items: center; } .grow { flex: 1; }
 
-.shell { display: grid; grid-template-rows: auto 1fr; height: 100%; }
+.shell { display: grid; grid-template-rows: auto 1fr; height: 100%; min-height: 0; overflow: hidden; }
 .topbar { display: flex; align-items: center; gap: var(--space-3); padding: 10px 18px; background: var(--glass); backdrop-filter: blur(14px); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 20; }
 .brand { font-weight: 800; letter-spacing: .02em; background: var(--gradient-primary); -webkit-background-clip: text; background-clip: text; color: transparent; font-size: 1.1rem; }
 .crumbs { display: flex; gap: 6px; align-items: center; color: var(--text-muted); } .crumbs a { color: var(--text-muted); }
 .pill { border: 1px solid var(--border); border-radius: 999px; padding: 2px 10px; font-size: .78rem; background: var(--surface-2); cursor: pointer; }
 .pill.author { border-color: var(--warning); color: var(--warning); } .pill.reader { border-color: var(--success); color: var(--success); }
-.main { overflow: auto; padding: var(--space-5) clamp(16px, 4vw, 48px); }
+.main { min-height: 0; overflow: auto; padding: var(--space-5) clamp(16px, 4vw, 48px); }
 .wrap { max-width: 1200px; margin: 0 auto; }
 h1.title { font-size: 2.2rem; margin: 0 0 4px; letter-spacing: -.02em; }
 .grid { display: grid; gap: var(--space-4); grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
@@ -107,7 +107,7 @@ table.cmp tr.differs td { background: color-mix(in srgb, var(--warning) 12%, tra
 .dm-only { border-left: 3px solid var(--danger); padding-left: 12px; } .gate-btn { opacity: .5; } .gate-btn.on { opacity: 1; color: var(--warning); }
 .subnav { display: flex; gap: 2px; padding: 0 18px; border-bottom: 1px solid var(--border); background: var(--surface); overflow-x: auto; }
 .subnav a { padding: 9px 14px; color: var(--text-muted); border-bottom: 2px solid transparent; white-space: nowrap; } .subnav a:hover { color: var(--text); text-decoration: none; } .subnav a.on { color: var(--text); border-color: var(--primary); }
-.shell { grid-template-rows: auto auto 1fr; } .shell.nosub { grid-template-rows: auto 1fr; }
+.shell { grid-template-rows: auto auto minmax(0, 1fr); } .shell.nosub { grid-template-rows: auto 1fr; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; } .chip { border: 1px solid var(--border); border-radius: 99px; padding: 2px 10px; font-size: .8rem; cursor: pointer; background: var(--surface-2); user-select: none; } .chip.off { opacity: .4; text-decoration: line-through; } .chip i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
 .graph-wrap { display: grid; grid-template-columns: 1fr 280px; gap: 12px; height: calc(100vh - 230px); min-height: 420px; } @media (max-width: 900px) { .graph-wrap { grid-template-columns: 1fr; } }
 .graph-canvas { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); position: relative; overflow: hidden; }
@@ -116,3 +116,5 @@ table.cmp tr.differs td { background: color-mix(in srgb, var(--warning) 12%, tra
 .entry { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 3px 10px; font-size: .88rem; display: inline-flex; align-items: center; gap: 6px; } .entry.drag { cursor: grab; } .dropzone.over { outline: 2px dashed var(--primary); outline-offset: -4px; }
 .tl { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; touch-action: none; user-select: none; } .tl text { fill: var(--text); font: 12px var(--font-ui); } .tl .lane-label { fill: var(--text-muted); font-weight: 600; } .tl .ev { cursor: pointer; } .tl .ev:hover circle { stroke: var(--text); stroke-width: 2; }
 .ladder .tier > b input { background: rgb(255 255 255 / .4); color: #111; border-color: transparent; padding: 3px 6px; }
+.skip { position: absolute; left: -999px; top: 0; z-index: 100; background: var(--primary); color: #fff; padding: 8px 14px; border-radius: 0 0 var(--radius-sm) 0; } .skip:focus { left: 0; }
+.main:focus { outline: none; }

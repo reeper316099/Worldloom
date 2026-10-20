@@ -4,3 +4,7 @@ dist
 .DS_Store
 .env
 .dev-data
+apps/desktop/release
+apps/web/dist
+test-results
+playwright-report

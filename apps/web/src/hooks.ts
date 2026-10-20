@@ -31,7 +31,9 @@ export function useLiveEvents() {
   useEffect(() => {
     const cfg = window.worldloom ?? { baseUrl: '', token: 'dev-token' };
     const es = new EventSource(`${cfg.baseUrl}/api/v1/events?access_token=${cfg.token}`);
-    es.onmessage = () => { void qc.invalidateQueries(); };
-    return () => es.close();
+    let t: number | undefined;
+    // coalesce bursts of file/page events into one refresh
+    es.onmessage = () => { window.clearTimeout(t); t = window.setTimeout(() => void qc.invalidateQueries(), 300); };
+    return () => { window.clearTimeout(t); es.close(); };
   }, [qc]);
 }

@@ -52,7 +52,7 @@ export function TimelineScreen({ w }: { w: string }) {
       </div>
       {data.events.length === 0 && <div className="card muted">No events to show at your current progress and filters.</div>}
       <div className="tl">
-        <svg width="100%" height={height} role="img" aria-label="Timeline" onWheel={onWheel}
+        <svg width="100%" height={height} role="group" aria-label="Timeline" onWheel={onWheel}
           onPointerDown={(e) => { drag.current = { x: e.clientX, tx: view.tx }; (e.currentTarget as SVGSVGElement).setPointerCapture(e.pointerId); }}
           onPointerMove={(e) => drag.current && setView({ ...view, tx: drag.current.tx + e.clientX - drag.current.x })}
           onPointerUp={() => { drag.current = null; }}>

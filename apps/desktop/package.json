@@ -1,0 +1,54 @@
+{
+  "name": "@worldloom/desktop",
+  "productName": "Worldloom",
+  "version": "0.1.0",
+  "description": "Local-first wiki builder for deep fictional lore",
+  "private": true,
+  "main": "dist/desktop.cjs",
+  "author": "Worldloom contributors",
+  "license": "MIT",
+  "scripts": {
+    "build": "node ../../scripts/build-desktop.mjs",
+    "start": "npm run build && electron .",
+    "pack": "npm run build && electron-builder --dir",
+    "dist": "npm run build && electron-builder"
+  },
+  "build": {
+    "appId": "dev.worldloom.app",
+    "productName": "Worldloom",
+    "asar": false,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "zip"
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Office"
+    },
+    "electronVersion": "34.5.8"
+  },
+  "devDependencies": {
+    "electron": "34.5.8",
+    "electron-builder": "^25.1.8",
+    "esbuild": "^0.24.0"
+  }
+}

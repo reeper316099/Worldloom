@@ -4,13 +4,13 @@ import { buildApp } from './app';
 import { WorldManager, defaultDataDir } from './manager';
 
 /** Starts the API on an ephemeral loopback port. Prints {port, token} as JSON for the desktop shell. */
-export async function startServer(o: { dataDir?: string; token?: string; port?: number; watch?: boolean } = {}) {
+export async function startServer(o: { dataDir?: string; token?: string; port?: number; watch?: boolean; staticDir?: string; starterDir?: string } = {}) {
   const dataDir = o.dataDir ?? defaultDataDir();
   const release = await acquireInstanceLock(dataDir);
-  const manager = await new WorldManager(dataDir, { watch: o.watch ?? true }).init({ launchBackup: true });
+  const manager = await new WorldManager(dataDir, { watch: o.watch ?? true }, o.starterDir).init({ launchBackup: true });
   const token = o.token ?? crypto.randomBytes(24).toString('hex');
-  const app = await buildApp({ token, manager, log: (l) => process.env.WORLDLOOM_LOG && process.stderr.write(JSON.stringify(l) + '\n') });
-  await app.listen({ host: '127.0.0.1', port: o.port ?? 0 });
+  const app = await buildApp({ token, manager, staticDir: o.staticDir, log: (l) => process.env.WORLDLOOM_LOG && process.stderr.write(JSON.stringify(l) + '\n') });
+  await app.listen({ host: '127.0.0.1', port: o.port ?? 0, backlog: 1024 });
   const addr = app.server.address();
   const port = typeof addr === 'object' && addr ? addr.port : 0;
   return {

@@ -6,15 +6,36 @@ export class ApiErr extends Error {
   constructor(public status: number, message: string, public details?: unknown) { super(message); }
 }
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Network-level failures (connection reset/refused, e.g. the API restarting) are retried for idempotent requests. */
 async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const res = await fetch(`${cfg.baseUrl}/api/v1${path}`, {
-    method,
-    headers: { Authorization: `Bearer ${cfg.token}`, ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}) },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  const idempotent = method === 'GET' || method === 'PUT' || method === 'DELETE';
+  let res: Response | undefined;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      res = await fetch(`${cfg.baseUrl}/api/v1${path}`, {
+        method,
+        headers: { Authorization: `Bearer ${cfg.token}`, ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}) },
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+      });
+      // a dev proxy answers 502/503/504 (or 500 with no JSON body) while the API is briefly unreachable
+      if (idempotent && attempt < 3 && res.status >= 500) {
+        const peek = await res.clone().text();
+        let ours = false;
+        try { ours = !!JSON.parse(peek)?.error; } catch { /* not our JSON error shape: the proxy answered */ }
+        if (!ours) { await sleep(250 * 2 ** attempt); continue; }
+      }
+      break;
+    } catch (e) {
+      if (!idempotent || attempt >= 3) throw new ApiErr(0, `Failed to fetch (${method} ${path.split('?')[0]}). The local API is not answering.`, e);
+      await sleep(250 * 2 ** attempt);
+    }
+  }
   const text = await res.text();
-  const data = text ? JSON.parse(text) : undefined;
-  if (!res.ok) throw new ApiErr(res.status, data?.error?.message ?? res.statusText, data?.error?.details);
+  let data: { error?: { message?: string; details?: unknown } } | undefined;
+  try { data = text ? JSON.parse(text) : undefined; } catch { /* non-JSON body from a proxy */ }
+  if (!res.ok) throw new ApiErr(res.status, data?.error?.message ?? (res.status >= 500 ? `The local API returned ${res.status}` : res.statusText), data?.error?.details);
   return data as T;
 }
 export const api = {

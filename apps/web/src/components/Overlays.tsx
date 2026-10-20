@@ -23,7 +23,7 @@ export function Help() {
   ];
   return (
     <div className="overlay" onClick={() => setHelp(false)}>
-      <div className="dialog help" role="dialog" aria-label="Keyboard shortcuts" onClick={(e) => e.stopPropagation()}>
+      <div className="dialog help" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts" onClick={(e) => e.stopPropagation()}>
         <h3 style={{ margin: 0 }}>Keyboard shortcuts</h3>
         <dl>{rows.map(([k, v]) => <div key={k}><dt>{k}</dt> <dd>{v}</dd></div>)}</dl>
       </div>

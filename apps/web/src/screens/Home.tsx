@@ -32,6 +32,16 @@ export function Home() {
     try { const w = await api.post<{ slug: string }>(`/starter-worlds/${id}/install`); await qc.invalidateQueries(); go(`/w/${w.slug}`); }
     catch (e) { useApp.getState().toast((e as Error).message); }
   };
+  const importBackup = async () => {
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = 'application/json,.json';
+    inp.onchange = async () => {
+      const f = inp.files?.[0]; if (!f) return;
+      try { const w = await api.post<{ slug: string }>('/import/backup', { backup: JSON.parse(await f.text()) }); await qc.invalidateQueries(); go(`/w/${w.slug}`); }
+      catch (e) { useApp.getState().toast((e as Error).message); }
+    };
+    inp.click();
+  };
   return (
     <>
       <div className="row" style={{ marginBottom: 24 }}>
@@ -39,9 +49,10 @@ export function Home() {
           <h1 className="title">Your worlds</h1>
           <div className="muted">One wiki per series or campaign. Everything is stored locally as Markdown and JSON.</div>
         </div>
+        <button className="btn" onClick={() => void importBackup()}>Import backup…</button>
         <button className="btn primary" onClick={() => setCreating(true)}>＋ New world</button>
       </div>
-      {error && <div className="card">Could not reach the local API: {(error as Error).message}</div>}
+      {error && <div className="card">Could not reach the local API: {(error as Error).message}. If you started the dev server twice, stop the other copy (only one can own the API port and the data folder) and reload.</div>}
       {isLoading && <div className="muted">Loading…</div>}
       {data && data.length === 0 && (
         <div className="card" style={{ textAlign: 'center', padding: 48 }}>
@@ -106,7 +117,7 @@ function NewWorld({ close }: { close: () => void }) {
   };
   return (
     <div className="overlay" onMouseDown={close}>
-      <form className="dialog" role="dialog" aria-label="New world" onMouseDown={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); if (name.trim()) void create(); }}>
+      <form className="dialog" role="dialog" aria-modal="true" aria-label="New world" onMouseDown={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); if (name.trim()) void create(); }}>
         <h3 style={{ margin: 0 }}>New world</h3>
         <label className="f">Name<input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="My Series" /></label>
         <label className="f">Template

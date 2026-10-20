@@ -26,7 +26,7 @@ export function RenameDialog({ w, id, title, close, onDone }: { w: string; id: s
   };
   return (
     <div className="overlay" onMouseDown={close}>
-      <form className="dialog" role="dialog" aria-label="Rename page" onMouseDown={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); void submit(); }}>
+      <form className="dialog" role="dialog" aria-modal="true" aria-label="Rename page" onMouseDown={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); void submit(); }}>
         <h3 style={{ margin: 0 }}>Rename page</h3>
         <input autoFocus value={value} onChange={(e) => setValue(e.target.value)} />
         <label className="f">Inbound links
